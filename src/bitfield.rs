@@ -1,7 +1,7 @@
 use std::ops::{BitAnd, BitOr, Not, Shl};
 
 /// A bit field trait for use in hashmap buckets.
-pub trait BitField: BitAnd + BitOr + Sized {
+pub trait BitField: BitAnd<Output=Self> + BitOr<Output=Self> + Sized {
 
     /// Should return a constant value describing how big the bitfield of this type is.
     fn size() -> usize;
@@ -44,17 +44,19 @@ impl BitSized for u64 {
 }
 
 impl <T> BitField for T where
-    T: BitSized + BitAnd + BitOr + Not<Output=T> + Shl<usize, Output=T> + From<u8>
+    T: BitSized + BitAnd<Output=T> + BitOr<Output=T> + Not<Output=T> + Shl<usize, Output=T> + From<u8>
 {
     fn size() -> usize {
         <T as BitSized>::size()
     }
 
     fn one_at(index: usize) -> Self {
-        Self::from(1u8) << index
+        Self::from(1) << index
     }
 
     fn zero_at(index: usize) -> Self {
         !Self::one_at(index)
     }
 }
+
+pub type DefaultBitField = u32;
