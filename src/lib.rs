@@ -57,7 +57,9 @@ impl <L, R> BiMap<L, R> {
             right_hasher: Default::default(),
         }
     }
+}
 
+impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// Returns a lower bound on the number of elements that this hashmap can hold without needing
     /// to be resized.
     pub fn capacity(&self) -> usize {
