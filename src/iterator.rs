@@ -29,7 +29,7 @@ impl<'a, L, R, B> Iterator for BiMapRefIterator<'a, L, R, B> where L: 'a, R: 'a 
         let &mut BiMapRefIterator { ref mut left_data, ref right_data } = self;
         left_data
             .filter_map(|bucket| bucket.data.as_ref())
-            .map(|&(ref key, value)| (key, &right_data[value].data.as_ref().unwrap().0))
+            .map(|&(ref key, value, _)| (key, &right_data[value].data.as_ref().unwrap().0))
             .next()
     }
 }
@@ -60,7 +60,7 @@ impl <L, R, B> Iterator for BiMapIterator<L, R, B> {
             if *index >= left_data.len() {
                 break None;
             }
-            if let Some((ref left, value)) = left_data[*index].data {
+            if let Some((ref left, value, _)) = left_data[*index].data {
                 let right = &right_data[value].data.as_ref().unwrap().0;
                 unsafe {
                     break Some((duplicate(left), duplicate(right)));

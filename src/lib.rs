@@ -96,10 +96,8 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
     ) -> Option<usize> {
         let len = key_data.len();
 
-        let neighbourhood = key_data[ideal_index].neighbourhood;
-
         // check that the neighbourhood isn't full - if it is the hashmap needs to be resized
-        if neighbourhood.full() {
+        if key_data[ideal_index].neighbourhood.full() {
             return None;
         }
 
@@ -115,7 +113,36 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
                 Some((offset + ideal_index) % len)
             } else {
                 // reshuffle the hashmap to make room for the next element
-                unimplemented!()
+                let mut offset_index = (ideal_index + offset) % len;
+                loop {
+                    // find an element that can be shuffled into the free space
+                    match (0..).map(|i| (len + offset_index - i) % len)
+                        .take(B::size())
+                        .skip(1)
+                        .filter(|&i| {
+                            let &(_, _, ideal) = key_data[i].data.as_ref().unwrap();
+                            ideal > ideal_index && ideal < offset_index
+                        })
+                        .next()
+                    {
+                        Some(index) => {
+                            // move the found element into the free space
+                            let bucket = key_data[index].data.take().unwrap();
+                            value_data[bucket.1].data.as_mut().unwrap().1 = offset_index;
+                            key_data[offset_index].data = Some(bucket);
+                            offset_index = index;
+
+                            // either return the newly created free space, if it's close enough, or
+                            // repeat - finding another element to move into this free space
+                            if (offset_index + len - ideal_index) % len < B::size() {
+                                break Some(offset_index);
+                            }
+                        },
+                        None => {
+                            break None;
+                        }
+                    }
+                }
             }
         } else {
             // the hashmap is entirely full - this should not be possible but if it happens just
@@ -142,8 +169,8 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
                 Self::mark_as_full(left_ideal_index, left_index, left_data);
                 Self::mark_as_full(right_ideal_index, right_index, right_data);
 
-                left_data[left_index].data = Some((left, right_index));
-                right_data[right_index].data = Some((right, left_index));
+                left_data[left_index].data = Some((left, right_index, left_ideal_index));
+                right_data[right_index].data = Some((right, left_index, right_ideal_index));
             },
             _ => {
                 /* resize */
@@ -182,8 +209,8 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
 
             // if we've reached this point, the key has been found at `offset` from `index`
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
-            let (_, value_index) = key_data[(index + offset) % len].data.take().unwrap();
-            let (value, _) = value_data[value_index].data.take().unwrap();
+            let (_, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
+            let (value, _, _) = value_data[value_index].data.take().unwrap();
 
             let ideal_value_index = {
                 let mut hasher = value_hasher.build_hasher();
@@ -268,5 +295,13 @@ mod test {
         assert_eq!(map.insert(4, 3), (None, None));
         assert_eq!(map.insert(3, 3), (Some(4), Some(4)));
         assert_eq!(map.insert(4, 4), (None, None));
+    }
+
+    #[test]
+    fn insert_lots_no_resize() {
+        let mut map: BiMap<u32, u32> = BiMap::new();
+        for x in 0..30 {
+            assert_eq!(map.insert(x, x), (None, None));
+        }
     }
 }
