@@ -18,6 +18,9 @@ pub trait BitField: BitAnd<Output=Self> + BitOr<Output=Self> + Copy + Sized {
     /// Return an iterator that iterates through the bitfield, returning the indexes within the
     /// bitfield that have 1s in them, in order from least significant to most significant.
     fn iter(&self) -> Self::Iter;
+
+    /// Is the bitfield currently full?
+    fn full(&self) -> bool;
 }
 
 /// Helper trait to reduce code duplication when implementing Bitfield for integer types.
@@ -95,6 +98,10 @@ impl <T> BitField for T where
 
     fn iter(&self) -> Self::Iter {
         BitFieldIterator(*self, 0)
+    }
+
+    fn full(&self) -> bool {
+        *self == Self::one_at(0) | Self::zero_at(0)
     }
 }
 

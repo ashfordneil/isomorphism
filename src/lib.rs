@@ -73,11 +73,85 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
     RH: BuildHasher,
     B: BitField
 {
-    /// Inserts a (L, R) pair into the hashmap. Returned is a (R, L) tuple of options. The
-    /// Option<R> is the value that was previously associated with the inserted L (or lack
-    /// thereof), and vice versa for the Option<L>.
+    /// Finds the ideal position of a key within the hashmap.
+    fn find_ideal_index<K: Hash, H: BuildHasher>(key: &K, hasher: &H, len: usize) -> usize {
+        let mut hasher = hasher.build_hasher();
+        key.hash(&mut hasher);
+        hasher.finish() as usize % len
+    }
+
+    /// Find the bitfield associated with an ideal hash index in a hashmap array, and mark a given
+    /// index as full.
+    fn mark_as_full<K>(ideal_index: usize, actual_index: usize, data: &mut[Bucket<K, usize, B>]) {
+        let offset = (data.len() + actual_index - ideal_index) % data.len();
+        data[ideal_index].neighbourhood = data[ideal_index].neighbourhood | B::one_at(offset);
+    }
+
+    /// Finds (or makes) a free space in which to insert a key in the hashmap. If this is not
+    /// possible, due to the hashmap being too full, then None is returned.
+    fn find_insert_index<K, V>(
+        ideal_index: usize,
+        key_data: &mut [Bucket<K, usize, B>],
+        value_data: &mut [Bucket<V, usize, B>],
+    ) -> Option<usize> {
+        let len = key_data.len();
+
+        let neighbourhood = key_data[ideal_index].neighbourhood;
+
+        // check that the neighbourhood isn't full - if it is the hashmap needs to be resized
+        if neighbourhood.full() {
+            return None;
+        }
+
+        // find the nearest free space
+        if let Some((offset, _)) = key_data[ideal_index..].iter()
+                .chain(key_data[..ideal_index].iter())
+                .enumerate()
+                .filter(|&(_, bucket)| bucket.data.is_none())
+                .next() {
+
+            // is this free space within the neighbourhood?
+            if offset < B::size() {
+                Some((offset + ideal_index) % len)
+            } else {
+                // reshuffle the hashmap to make room for the next element
+                unimplemented!()
+            }
+        } else {
+            // the hashmap is entirely full - this should not be possible but if it happens just
+            // resize
+            None
+        }
+    }
+
+    /// Inserts an (L, R) pair into the hashmap. Returned is a (R, L) tuple of options. The
+    /// `Option<R>` is the value that was previously associated with the inserted L (or lack
+    /// thereof), and vice versa for the `Option<L>`.
     pub fn insert(&mut self, left: L, right: R) -> (Option<R>, Option<L>) {
-        unimplemented!()
+        let output_right = self.remove_left(&left);
+        let output_left = self.remove_right(&right);
+
+        let &mut BiMap { ref mut left_data, ref mut right_data, ref left_hasher, ref right_hasher } = self;
+        let left_ideal_index = Self::find_ideal_index(&left, left_hasher, left_data.len());
+        let right_ideal_index = Self::find_ideal_index(&right, right_hasher, right_data.len());
+        let left_index = Self::find_insert_index(left_ideal_index, left_data, right_data);
+        let right_index = Self::find_insert_index(right_ideal_index, right_data, left_data);
+
+        match (left_index, right_index) {
+            (Some(left_index), Some(right_index)) => {
+                Self::mark_as_full(left_ideal_index, left_index, left_data);
+                Self::mark_as_full(right_ideal_index, right_index, right_data);
+
+                left_data[left_index].data = Some((left, right_index));
+                right_data[right_index].data = Some((right, left_index));
+            },
+            _ => {
+                /* resize */
+                unimplemented!()
+            },
+        };
+
+        (output_right, output_left)
     }
 
     /// Removes a key from the key_data section of the hashmap, and removes the value from the
@@ -93,11 +167,7 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
         where Q: Hash + Eq, K: Hash + Eq + Borrow<Q>, V: Hash, KH: BuildHasher, VH: BuildHasher,
     {
         let len = key_data.len();
-        let index = {
-            let mut hasher = key_hasher.build_hasher();
-            key.hash(&mut hasher);
-            hasher.finish() as usize
-        } % len;
+        let index = Self::find_ideal_index(&key, key_hasher, len);
 
         let neighbourhood = key_data[index].neighbourhood;
         for offset in key_data[index].neighbourhood.iter() {
@@ -113,7 +183,7 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
             // if we've reached this point, the key has been found at `offset` from `index`
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
             let (_, value_index) = key_data[(index + offset) % len].data.take().unwrap();
-            let (value, _) = value_data[(index + offset) % len].data.take().unwrap();
+            let (value, _) = value_data[value_index].data.take().unwrap();
 
             let ideal_value_index = {
                 let mut hasher = value_hasher.build_hasher();
@@ -123,7 +193,8 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
 
             let value_offset = (value_index + len - ideal_value_index) % len;
 
-            value_data[ideal_value_index].neighbourhood = value_data[ideal_value_index].neighbourhood & B::zero_at(value_offset);
+            value_data[ideal_value_index].neighbourhood =
+                value_data[ideal_value_index].neighbourhood & B::zero_at(value_offset);
 
             return Some(value);
         }
@@ -188,5 +259,14 @@ mod test {
         let mut map: BiMap<u32, u32> = BiMap::new();
         assert_eq!(map.remove_left(&1024), None);
         assert_eq!(map.remove_right(&1024), None);
+    }
+
+    #[test]
+    fn insert() {
+        let mut map: BiMap<u32, u32> = BiMap::new();
+        assert_eq!(map.insert(3, 4), (None, None));
+        assert_eq!(map.insert(4, 3), (None, None));
+        assert_eq!(map.insert(3, 3), (Some(4), Some(4)));
+        assert_eq!(map.insert(4, 4), (None, None));
     }
 }
