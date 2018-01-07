@@ -1,4 +1,4 @@
-use ::bitfield::BitField;
+use bitfield::BitField;
 
 /// A single bucket within a hopscotch hashed hashmap.
 #[derive(Clone, Debug)]
@@ -12,8 +12,7 @@ pub struct Bucket<K, V, B> {
     pub neighbourhood: B,
 }
 
-impl <K, V, B: BitField + Copy> Bucket<K, V, B> {
-
+impl<K, V, B: BitField + Copy> Bucket<K, V, B> {
     /// Create a new heap allocated array, with a given size, of empty buckets.
     pub fn empty_vec(size: usize) -> Box<[Self]> {
         let mut output = Vec::with_capacity(size);
@@ -47,6 +46,10 @@ mod tests {
         let length = 1024;
         let vec: Box<[Bucket<(), (), DefaultBitField>]> = Bucket::empty_vec(length);
         assert!(vec.len() == length);
-        assert!(vec.iter().all(|element| element.data == None && element.neighbourhood == 0));
+        assert!(
+            vec.iter()
+                .all(|element| element.data == None && element.neighbourhood == 0)
+        );
     }
 }
+

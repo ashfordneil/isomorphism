@@ -2,7 +2,7 @@ use std::iter::Iterator;
 use std::ops::{BitAnd, BitOr, Not, Shl, Shr};
 
 /// A bit field trait for use in hashmap buckets.
-pub trait BitField: BitAnd<Output=Self> + BitOr<Output=Self> + Copy + Sized {
+pub trait BitField: BitAnd<Output = Self> + BitOr<Output = Self> + Copy + Sized {
     /// See the documentation for the `iter` function.
     type Iter: Iterator<Item = usize>;
 
@@ -55,8 +55,9 @@ impl BitSized for u64 {
 
 pub struct BitFieldIterator<T>(T, usize);
 
-impl<T> Iterator for BitFieldIterator<T> where
-        T: Eq + BitAnd<Output=T> + Shr<usize, Output=T> + From<u8> + Copy
+impl<T> Iterator for BitFieldIterator<T>
+where
+    T: Eq + BitAnd<Output = T> + Shr<usize, Output = T> + From<u8> + Copy,
 {
     type Item = usize;
 
@@ -79,8 +80,17 @@ impl<T> Iterator for BitFieldIterator<T> where
 
 
 
-impl <T> BitField for T where
-    T: BitSized + BitAnd<Output=T> + BitOr<Output=T> + Eq + Not<Output=T> + Shl<usize, Output=T> + Shr<usize, Output=T> + From<u8> + Copy
+impl<T> BitField for T
+where
+    T: BitSized
+        + BitAnd<Output = T>
+        + BitOr<Output = T>
+        + Eq
+        + Not<Output = T>
+        + Shl<usize, Output = T>
+        + Shr<usize, Output = T>
+        + From<u8>
+        + Copy,
 {
     type Iter = BitFieldIterator<T>;
 
@@ -109,7 +119,7 @@ pub type DefaultBitField = u32;
 
 #[cfg(test)]
 mod test {
-    use ::BitField;
+    use BitField;
 
     #[test]
     fn test_basics() {
@@ -125,3 +135,4 @@ mod test {
         )
     }
 }
+

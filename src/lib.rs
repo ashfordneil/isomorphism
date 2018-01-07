@@ -12,7 +12,7 @@ pub mod iterator;
 
 use bitfield::{BitField, DefaultBitField};
 use bucket::Bucket;
-use iterator::{BiMapRefIterator, BiMapIterator};
+use iterator::{BiMapIterator, BiMapRefIterator};
 
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
@@ -40,7 +40,7 @@ pub struct BiMap<L, R, LH = RandomState, RH = RandomState, B = DefaultBitField> 
     right_hasher: RH,
 }
 
-impl <L, R> BiMap<L, R> {
+impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap.
     pub fn new() -> Self {
         Self::with_capacity(DEFAULT_HASH_MAP_SIZE)
@@ -50,15 +50,19 @@ impl <L, R> BiMap<L, R> {
     /// elements can be inserted before the map needs to be resized.
     pub fn with_capacity(capacity: usize) -> Self {
         BiMap {
-            left_data: Bucket::empty_vec(capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR),
-            right_data: Bucket::empty_vec(capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR),
+            left_data: Bucket::empty_vec(
+                capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR,
+            ),
+            right_data: Bucket::empty_vec(
+                capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR,
+            ),
             left_hasher: Default::default(),
             right_hasher: Default::default(),
         }
     }
 }
 
-impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
+impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// Returns a lower bound on the number of elements that this hashmap can hold without needing
     /// to be resized.
     pub fn capacity(&self) -> usize {
@@ -66,12 +70,13 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     }
 }
 
-impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
+impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B>
+where
     L: Hash + Eq,
     R: Hash + Eq,
     LH: BuildHasher,
     RH: BuildHasher,
-    B: BitField
+    B: BitField,
 {
     /// Finds the ideal position of a key within the hashmap.
     fn find_ideal_index<K: Hash, H: BuildHasher>(key: &K, hasher: &H, len: usize) -> usize {
@@ -82,7 +87,7 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
 
     /// Find the bitfield associated with an ideal hash index in a hashmap array, and mark a given
     /// index as full.
-    fn mark_as_full<K>(ideal_index: usize, actual_index: usize, data: &mut[Bucket<K, usize, B>]) {
+    fn mark_as_full<K>(ideal_index: usize, actual_index: usize, data: &mut [Bucket<K, usize, B>]) {
         let offset = (data.len() + actual_index - ideal_index) % data.len();
         data[ideal_index].neighbourhood = data[ideal_index].neighbourhood | B::one_at(offset);
     }
@@ -102,12 +107,13 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
         }
 
         // find the nearest free space
-        if let Some((offset, _)) = key_data[ideal_index..].iter()
-                .chain(key_data[..ideal_index].iter())
-                .enumerate()
-                .filter(|&(_, bucket)| bucket.data.is_none())
-                .next() {
-
+        if let Some((offset, _)) = key_data[ideal_index..]
+            .iter()
+            .chain(key_data[..ideal_index].iter())
+            .enumerate()
+            .filter(|&(_, bucket)| bucket.data.is_none())
+            .next()
+        {
             // is this free space within the neighbourhood?
             if offset < B::size() {
                 Some((offset + ideal_index) % len)
@@ -116,7 +122,8 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
                 let mut offset_index = (ideal_index + offset) % len;
                 loop {
                     // find an element that can be shuffled into the free space
-                    match (0..).map(|i| (len + offset_index - i) % len)
+                    match (0..)
+                        .map(|i| (len + offset_index - i) % len)
                         .take(B::size())
                         .skip(1)
                         .filter(|&i| {
@@ -137,7 +144,7 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
                             if (offset_index + len - ideal_index) % len < B::size() {
                                 break Some(offset_index);
                             }
-                        },
+                        }
                         None => {
                             break None;
                         }
@@ -158,7 +165,12 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
         let output_right = self.remove_left(&left);
         let output_left = self.remove_right(&right);
 
-        let &mut BiMap { ref mut left_data, ref mut right_data, ref left_hasher, ref right_hasher } = self;
+        let &mut BiMap {
+            ref mut left_data,
+            ref mut right_data,
+            ref left_hasher,
+            ref right_hasher,
+        } = self;
         let left_ideal_index = Self::find_ideal_index(&left, left_hasher, left_data.len());
         let right_ideal_index = Self::find_ideal_index(&right, right_hasher, right_data.len());
         let left_index = Self::find_insert_index(left_ideal_index, left_data, right_data);
@@ -171,11 +183,11 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
 
                 left_data[left_index].data = Some((left, right_index, left_ideal_index));
                 right_data[right_index].data = Some((right, left_index, right_ideal_index));
-            },
+            }
             _ => {
                 /* resize */
                 unimplemented!()
-            },
+            }
         };
 
         (output_right, output_left)
@@ -191,7 +203,12 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
         key_hasher: &KH,
         value_hasher: &VH,
     ) -> Option<V>
-        where Q: Hash + Eq, K: Hash + Eq + Borrow<Q>, V: Hash, KH: BuildHasher, VH: BuildHasher,
+    where
+        Q: Hash + Eq,
+        K: Hash + Eq + Borrow<Q>,
+        V: Hash,
+        KH: BuildHasher,
+        VH: BuildHasher,
     {
         let len = key_data.len();
         let index = Self::find_ideal_index(&key, key_hasher, len);
@@ -231,42 +248,68 @@ impl <L, R, LH, RH, B> BiMap<L, R, LH, RH, B> where
 
     /// Removes a key from the left of the hashmap. Returns the value from the right of the hashmap
     /// that associates with this key, if it exists.
-    pub fn remove_left<Q: ?Sized>(&mut self, left: &Q) -> Option<R> where L: Borrow<Q>, Q: Hash + Eq {
-        let &mut BiMap { ref mut left_data, ref mut right_data, ref left_hasher, ref right_hasher } = self;
+    pub fn remove_left<Q: ?Sized>(&mut self, left: &Q) -> Option<R>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let &mut BiMap {
+            ref mut left_data,
+            ref mut right_data,
+            ref left_hasher,
+            ref right_hasher,
+        } = self;
         Self::remove(left, left_data, right_data, left_hasher, right_hasher)
     }
 
     /// Removes a key from the right of the hashmap. Returns the value from the left of the hashmap
     /// that associates with this key, if it exists.
-    pub fn remove_right<Q: ?Sized>(&mut self, right: &Q) -> Option<L> where R: Borrow<Q>, Q: Hash + Eq {
-        let &mut BiMap { ref mut left_data, ref mut right_data, ref left_hasher, ref right_hasher } =self;
+    pub fn remove_right<Q: ?Sized>(&mut self, right: &Q) -> Option<L>
+    where
+        R: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let &mut BiMap {
+            ref mut left_data,
+            ref mut right_data,
+            ref left_hasher,
+            ref right_hasher,
+        } = self;
         Self::remove(right, right_data, left_data, right_hasher, left_hasher)
     }
 }
 
-impl <'a, L, R, LH, RH, B> IntoIterator for &'a BiMap<L, R, LH, RH, B> {
+impl<'a, L, R, LH, RH, B> IntoIterator for &'a BiMap<L, R, LH, RH, B> {
     type Item = (&'a L, &'a R);
     type IntoIter = BiMapRefIterator<'a, L, R, B>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let &BiMap { ref left_data, ref right_data, .. } = self;
+        let &BiMap {
+            ref left_data,
+            ref right_data,
+            ..
+        } = self;
         BiMapRefIterator::new(left_data.iter(), &right_data)
     }
 }
 
-impl <L, R, LH, RH, B> IntoIterator for BiMap<L, R, LH, RH, B> {
+impl<L, R, LH, RH, B> IntoIterator for BiMap<L, R, LH, RH, B> {
     type Item = (L, R);
     type IntoIter = BiMapIterator<L, R, B>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let BiMap { left_data, right_data, .. } = self;
+        let BiMap {
+            left_data,
+            right_data,
+            ..
+        } = self;
         BiMapIterator::new(left_data, right_data)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use ::BiMap;
+    use BiMap;
 
     #[test]
     fn test_capacity() {
@@ -305,3 +348,4 @@ mod test {
         }
     }
 }
+
