@@ -17,8 +17,11 @@ use iterator::{BiMapIterator, BiMapRefIterator};
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
+use std::iter;
+use std::mem;
 
 const DEFAULT_HASH_MAP_SIZE: usize = 32;
+const RESIZE_GROWTH_FACTOR: usize = 2;
 
 // left as a fraction to avoid floating point multiplication and division where it isn't needed
 const MAX_LOAD_FACTOR_NUMERATOR: usize = 11;
@@ -165,30 +168,45 @@ where
         let output_right = self.remove_left(&left);
         let output_left = self.remove_right(&right);
 
-        let &mut BiMap {
-            ref mut left_data,
-            ref mut right_data,
-            ref left_hasher,
-            ref right_hasher,
-        } = self;
-        let left_ideal_index = Self::find_ideal_index(&left, left_hasher, left_data.len());
-        let right_ideal_index = Self::find_ideal_index(&right, right_hasher, right_data.len());
-        let left_index = Self::find_insert_index(left_ideal_index, left_data, right_data);
-        let right_index = Self::find_insert_index(right_ideal_index, right_data, left_data);
+        let left_ideal_index =
+            Self::find_ideal_index(&left, &self.left_hasher, self.left_data.len());
+        let right_ideal_index =
+            Self::find_ideal_index(&right, &self.right_hasher, self.right_data.len());
 
-        match (left_index, right_index) {
-            (Some(left_index), Some(right_index)) => {
-                Self::mark_as_full(left_ideal_index, left_index, left_data);
-                Self::mark_as_full(right_ideal_index, right_index, right_data);
+        let insert_indexes = {
+            let &mut BiMap {
+                ref mut left_data,
+                ref mut right_data,
+                ..
+            } = self;
+            let left_index = Self::find_insert_index(left_ideal_index, left_data, right_data);
+            let right_index = Self::find_insert_index(right_ideal_index, right_data, left_data);
 
-                left_data[left_index].data = Some((left, right_index, left_ideal_index));
-                right_data[right_index].data = Some((right, left_index, right_ideal_index));
-            }
-            _ => {
-                /* resize */
-                unimplemented!()
+            if let (Some(left_index), Some(right_index)) = (left_index, right_index) {
+                Some((left_index, right_index))
+            } else {
+                None
             }
         };
+
+        if let Some((left_index, right_index)) = insert_indexes {
+            Self::mark_as_full(left_ideal_index, left_index, &mut self.left_data);
+            Self::mark_as_full(right_ideal_index, right_index, &mut self.right_data);
+
+            self.left_data[left_index].data = Some((left, right_index, left_ideal_index));
+            self.right_data[right_index].data = Some((right, left_index, right_ideal_index));
+        } else {
+            /* resize */
+            let capacity = self.left_data.len() * RESIZE_GROWTH_FACTOR;
+            let old_left_data = mem::replace(&mut self.left_data, Bucket::empty_vec(capacity));
+            let old_right_data = mem::replace(&mut self.right_data, Bucket::empty_vec(capacity));
+
+            iter::once((left, right))
+                .chain(BiMapIterator::new(old_left_data, old_right_data))
+                .for_each(|(left, right)| {
+                    self.insert(left, right);
+                });
+        }
 
         (output_right, output_left)
     }
@@ -344,6 +362,14 @@ mod test {
     fn insert_lots_no_resize() {
         let mut map: BiMap<u32, u32> = BiMap::new();
         for x in 0..30 {
+            assert_eq!(map.insert(x, x), (None, None));
+        }
+    }
+
+    #[test]
+    fn insert_lots_resize() {
+        let mut map: BiMap<u32, u32> = BiMap::new();
+        for x in 0..300 {
             assert_eq!(map.insert(x, x), (None, None));
         }
     }
