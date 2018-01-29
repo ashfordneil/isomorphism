@@ -2,7 +2,7 @@ extern crate bimap;
 #[macro_use]
 extern crate quickcheck;
 
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 
 use bimap::BiMap;
 
@@ -37,5 +37,20 @@ quickcheck! {
         }
 
         TestResult::passed()
+    }
+
+    fn insert(inputs: Vec<(usize, char)>) -> bool {
+        let mut map = BiMap::new();
+        let mut left = HashMap::new();
+        let mut right = HashMap::new();
+
+        inputs
+            .into_iter()
+            .all(|(a, b)| {
+                let old_b = left.insert(a, b);
+                let old_a = right.insert(b, a);
+
+                map.insert(a, b) == (old_b, old_a)
+            })
     }
 }

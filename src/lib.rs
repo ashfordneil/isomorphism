@@ -56,7 +56,8 @@ impl<L, R> BiMap<L, R> {
         let capacity = if capacity == 0 {
             0
         } else {
-            cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR
+            cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) * MAX_LOAD_FACTOR_NUMERATOR
+                / MAX_LOAD_FACTOR_DENOMINATOR
         };
         BiMap {
             left_data: Bucket::empty_vec(capacity),
@@ -337,14 +338,4 @@ mod test {
         assert_eq!((&map).into_iter().next(), None);
         assert_eq!(map.into_iter().next(), None);
     }
-
-    #[test]
-    fn insert() {
-        let mut map: BiMap<u32, u32> = BiMap::new();
-        assert_eq!(map.insert(3, 4), (None, None));
-        assert_eq!(map.insert(4, 3), (None, None));
-        assert_eq!(map.insert(3, 3), (Some(4), Some(4)));
-        assert_eq!(map.insert(4, 4), (None, None));
-    }
 }
-
