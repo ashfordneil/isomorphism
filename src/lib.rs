@@ -339,13 +339,6 @@ mod test {
     }
 
     #[test]
-    fn remove_from_empty() {
-        let mut map: BiMap<u32, u32> = BiMap::new();
-        assert_eq!(map.remove_left(&1024), None);
-        assert_eq!(map.remove_right(&1024), None);
-    }
-
-    #[test]
     fn insert() {
         let mut map: BiMap<u32, u32> = BiMap::new();
         assert_eq!(map.insert(3, 4), (None, None));

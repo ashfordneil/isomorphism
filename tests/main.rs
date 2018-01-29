@@ -13,6 +13,11 @@ quickcheck! {
         BiMap::<(), ()>::with_capacity(cap).capacity() >= cap
     }
 
+    fn remove_from_empty(a: usize, b: char) -> bool {
+        let mut map: BiMap<usize, char> = BiMap::new();
+        map.remove_left(&a) == None && map.remove_right(&b) == None
+    }
+
     fn insert_unique(inputs: Vec<(usize, char)>) -> TestResult {
         let mut map = BiMap::new();
         let mut left = HashSet::<usize>::new();
