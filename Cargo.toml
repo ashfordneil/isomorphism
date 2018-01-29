@@ -1,6 +1,9 @@
 [package]
+authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "bimap"
 version = "0.1.0"
-authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 
 [dependencies]
+
+[dev-dependencies]
+quickcheck = "0.6.0"

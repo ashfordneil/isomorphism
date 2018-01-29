@@ -15,6 +15,7 @@ use bucket::Bucket;
 use iterator::{BiMapIterator, BiMapRefIterator};
 
 use std::borrow::Borrow;
+use std::cmp;
 use std::collections::hash_map::RandomState;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::iter;
@@ -52,13 +53,14 @@ impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap with a given capacity. It is guaranteed that at least capacity
     /// elements can be inserted before the map needs to be resized.
     pub fn with_capacity(capacity: usize) -> Self {
+        let capacity = if capacity == 0 {
+            0
+        } else {
+            cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR
+        };
         BiMap {
-            left_data: Bucket::empty_vec(
-                capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR,
-            ),
-            right_data: Bucket::empty_vec(
-                capacity * MAX_LOAD_FACTOR_NUMERATOR / MAX_LOAD_FACTOR_DENOMINATOR,
-            ),
+            left_data: Bucket::empty_vec(capacity),
+            right_data: Bucket::empty_vec(capacity),
             left_hasher: Default::default(),
             right_hasher: Default::default(),
         }
@@ -330,12 +332,6 @@ mod test {
     use BiMap;
 
     #[test]
-    fn test_capacity() {
-        BiMap::<(), ()>::with_capacity(0).capacity();
-        assert!(BiMap::<(), ()>::with_capacity(1024).capacity() >= 1024);
-    }
-
-    #[test]
     fn test_iteration_empty() {
         let map: BiMap<(), ()> = BiMap::new();
         assert_eq!((&map).into_iter().next(), None);
@@ -356,22 +352,6 @@ mod test {
         assert_eq!(map.insert(4, 3), (None, None));
         assert_eq!(map.insert(3, 3), (Some(4), Some(4)));
         assert_eq!(map.insert(4, 4), (None, None));
-    }
-
-    #[test]
-    fn insert_lots_no_resize() {
-        let mut map: BiMap<u32, u32> = BiMap::new();
-        for x in 0..30 {
-            assert_eq!(map.insert(x, x), (None, None));
-        }
-    }
-
-    #[test]
-    fn insert_lots_resize() {
-        let mut map: BiMap<u32, u32> = BiMap::new();
-        for x in 0..300 {
-            assert_eq!(map.insert(x, x), (None, None));
-        }
     }
 }
 
