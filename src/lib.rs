@@ -168,8 +168,30 @@ where
     /// `Option<R>` is the value that was previously associated with the inserted L (or lack
     /// thereof), and vice versa for the `Option<L>`.
     pub fn insert(&mut self, left: L, right: R) -> (Option<R>, Option<L>) {
-        let output_right = self.remove_left(&left);
-        let output_left = self.remove_right(&right);
+        let output = {
+            let &mut BiMap {
+                ref mut left_data,
+                ref mut right_data,
+                ref left_hasher,
+                ref right_hasher,
+            } = self;
+            match Self::remove(&left, left_data, right_data, left_hasher, right_hasher) {
+                Some((old_left, old_right)) => if old_right == right {
+                    (Some(old_right), Some(old_left))
+                } else {
+                    (
+                        Some(old_right),
+                        Self::remove(&right, right_data, left_data, right_hasher, left_hasher)
+                            .map(|(_key, value)| value),
+                    )
+                },
+                None => (
+                    None,
+                    Self::remove(&right, right_data, left_data, right_hasher, left_hasher)
+                        .map(|(_key, value)| value),
+                ),
+            }
+        };
 
         let left_ideal_index =
             Self::find_ideal_index(&left, &self.left_hasher, self.left_data.len());
@@ -211,7 +233,7 @@ where
                 });
         }
 
-        (output_right, output_left)
+        output
     }
 
     /// Removes a key from the key_data section of the hashmap, and removes the value from the
@@ -223,7 +245,7 @@ where
         value_data: &mut [Bucket<V, usize, B>],
         key_hasher: &KH,
         value_hasher: &VH,
-    ) -> Option<V>
+    ) -> Option<(K, V)>
     where
         Q: Hash + Eq,
         K: Hash + Eq + Borrow<Q>,
@@ -235,36 +257,26 @@ where
         let index = Self::find_ideal_index(&key, key_hasher, len);
 
         let neighbourhood = key_data[index].neighbourhood;
-        for offset in key_data[index].neighbourhood.iter() {
-            let key_index = (index + offset) % len;
-            if let Some(ref data) = key_data[key_index].data {
-                if data.0.borrow() != key {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-
-            // if we've reached this point, the key has been found at `offset` from `index`
+        if let Some(offset) = neighbourhood.iter().find(
+            |offset| match key_data[(index + offset) % len].data {
+                Some((ref canidate_key, ..)) => canidate_key.borrow() == key,
+                _ => false,
+            },
+        ) {
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
-            let (_, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
-            let (value, _, _) = value_data[value_index].data.take().unwrap();
+            let (key, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
+            let (value, ..) = value_data[value_index].data.take().unwrap();
 
-            let ideal_value_index = {
-                let mut hasher = value_hasher.build_hasher();
-                value.hash(&mut hasher);
-                hasher.finish() as usize
-            } % len;
-
+            let ideal_value_index = Self::find_ideal_index(&value, value_hasher, len);
             let value_offset = (value_index + len - ideal_value_index) % len;
 
             value_data[ideal_value_index].neighbourhood =
                 value_data[ideal_value_index].neighbourhood & B::zero_at(value_offset);
 
-            return Some(value);
+            Some((key, value))
+        } else {
+            None
         }
-
-        None
     }
 
     /// Removes a key from the left of the hashmap. Returns the value from the right of the hashmap
@@ -281,6 +293,7 @@ where
             ref right_hasher,
         } = self;
         Self::remove(left, left_data, right_data, left_hasher, right_hasher)
+            .map(|(_key, value)| value)
     }
 
     /// Removes a key from the right of the hashmap. Returns the value from the left of the hashmap
@@ -297,6 +310,7 @@ where
             ref right_hasher,
         } = self;
         Self::remove(right, right_data, left_data, right_hasher, left_hasher)
+            .map(|(_key, value)| value)
     }
 }
 

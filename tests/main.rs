@@ -12,12 +12,16 @@ quickcheck! {
     fn test_capacity(cap: usize) -> bool {
         BiMap::<(), ()>::with_capacity(cap).capacity() >= cap
     }
+}
 
+quickcheck! {
     fn remove_from_empty(a: usize, b: char) -> bool {
         let mut map: BiMap<usize, char> = BiMap::new();
         map.remove_left(&a) == None && map.remove_right(&b) == None
     }
+}
 
+quickcheck! {
     fn insert_unique(inputs: Vec<(usize, char)>) -> TestResult {
         let mut map = BiMap::new();
         let mut left = HashSet::<usize>::new();
@@ -38,7 +42,9 @@ quickcheck! {
 
         TestResult::passed()
     }
+}
 
+quickcheck! {
     fn insert(inputs: Vec<(usize, char)>) -> bool {
         let mut map = BiMap::new();
         let mut left = HashMap::new();
@@ -49,6 +55,14 @@ quickcheck! {
             .all(|(a, b)| {
                 let old_b = left.insert(a, b);
                 let old_a = right.insert(b, a);
+
+                if let Some(ref b) = old_b {
+                    right.remove(b);
+                }
+
+                if let Some(ref a) = old_a {
+                    left.remove(a);
+                }
 
                 map.insert(a, b) == (old_b, old_a)
             })

@@ -1,15 +1,7 @@
 use bucket::Bucket;
 
 use std::iter::Iterator;
-use std::mem;
-use std::ptr;
 use std::slice;
-
-unsafe fn duplicate<T>(input: &T) -> T {
-    let mut output = mem::uninitialized();
-    ptr::copy_nonoverlapping(input, &mut output, mem::size_of::<T>());
-    output
-}
 
 pub struct BiMapRefIterator<'a, L, R, B>
 where
@@ -78,8 +70,8 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let &mut BiMapIterator {
-            ref left_data,
-            ref right_data,
+            ref mut left_data,
+            ref mut right_data,
             ref mut index,
         } = self;
         let output = loop {
@@ -87,11 +79,10 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
             if *index >= left_data.len() {
                 break None;
             }
-            if let Some((ref left, value, _)) = left_data[*index].data {
-                let right = &right_data[value].data.as_ref().unwrap().0;
-                unsafe {
-                    break Some((duplicate(left), duplicate(right)));
-                }
+            if left_data[*index].data.is_some() {
+                let (left, right_index, ..) = left_data[*index].data.take().unwrap();
+                let (right, ..) = right_data[right_index].data.take().unwrap();
+                break Some((left, right));
             }
         };
         output
