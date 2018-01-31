@@ -35,7 +35,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         let &mut BiMapRefIterator {
             ref mut left_data,
-            ref right_data,
+            right_data,
         } = self;
         left_data
             .filter_map(|bucket| bucket.data.as_ref())
@@ -74,7 +74,8 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
             ref mut right_data,
             ref mut index,
         } = self;
-        let output = loop {
+
+        loop {
             *index += 1;
             if *index >= left_data.len() {
                 break None;
@@ -84,8 +85,7 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
                 let (right, ..) = right_data[right_index].data.take().unwrap();
                 break Some((left, right));
             }
-        };
-        output
+        }
     }
 }
 

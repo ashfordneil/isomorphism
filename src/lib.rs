@@ -44,10 +44,16 @@ pub struct BiMap<L, R, LH = RandomState, RH = RandomState, B = DefaultBitField> 
     right_hasher: RH,
 }
 
+impl<L, R> Default for BiMap<L, R> {
+    fn default() -> Self {
+        Self::with_capacity(DEFAULT_HASH_MAP_SIZE)
+    }
+}
+
 impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap.
     pub fn new() -> Self {
-        Self::with_capacity(DEFAULT_HASH_MAP_SIZE)
+        Default::default()
     }
 
     /// Creates a new empty BiMap with a given capacity. It is guaranteed that at least capacity
@@ -117,8 +123,7 @@ where
             .iter()
             .chain(key_data[..ideal_index].iter())
             .enumerate()
-            .filter(|&(_, bucket)| bucket.data.is_none())
-            .next()
+            .find(|&(_, bucket)| bucket.data.is_none())
         {
             // is this free space within the neighbourhood?
             if offset < B::size() {
@@ -132,11 +137,10 @@ where
                         .map(|i| (len + offset_index - i) % len)
                         .take(B::size())
                         .skip(1)
-                        .filter(|&i| {
+                        .find(|&i| {
                             let &(_, _, ideal) = key_data[i].data.as_ref().unwrap();
                             ideal > ideal_index && ideal < offset_index
                         })
-                        .next()
                     {
                         Some(index) => {
                             // move the found element into the free space
@@ -324,7 +328,7 @@ impl<'a, L, R, LH, RH, B> IntoIterator for &'a BiMap<L, R, LH, RH, B> {
             ref right_data,
             ..
         } = self;
-        BiMapRefIterator::new(left_data.iter(), &right_data)
+        BiMapRefIterator::new(left_data.iter(), right_data)
     }
 }
 
