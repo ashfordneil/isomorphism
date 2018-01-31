@@ -25,8 +25,7 @@ const DEFAULT_HASH_MAP_SIZE: usize = 32;
 const RESIZE_GROWTH_FACTOR: usize = 2;
 
 // left as a fraction to avoid floating point multiplication and division where it isn't needed
-const MAX_LOAD_FACTOR_NUMERATOR: usize = 11;
-const MAX_LOAD_FACTOR_DENOMINATOR: usize = 10;
+const MAX_LOAD_FACTOR: f32 = 1.1;
 
 /// The two way hashmap itself. See the module level documentation for more information.
 ///
@@ -62,8 +61,7 @@ impl<L, R> BiMap<L, R> {
         let capacity = if capacity == 0 {
             0
         } else {
-            cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) * MAX_LOAD_FACTOR_NUMERATOR
-                / MAX_LOAD_FACTOR_DENOMINATOR
+            (cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) as f32 * MAX_LOAD_FACTOR).ceil() as usize
         };
         BiMap {
             left_data: Bucket::empty_vec(capacity),
@@ -78,7 +76,7 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// Returns a lower bound on the number of elements that this hashmap can hold without needing
     /// to be resized.
     pub fn capacity(&self) -> usize {
-        self.left_data.len() / MAX_LOAD_FACTOR_DENOMINATOR * MAX_LOAD_FACTOR_NUMERATOR
+        (self.left_data.len() as f32 / MAX_LOAD_FACTOR).floor() as usize
     }
 }
 
@@ -140,8 +138,7 @@ where
                         .find(|&i| {
                             let &(_, _, ideal) = key_data[i].data.as_ref().unwrap();
                             ideal > ideal_index && ideal < offset_index
-                        })
-                    {
+                        }) {
                         Some(index) => {
                             // move the found element into the free space
                             let bucket = key_data[index].data.take().unwrap();
