@@ -76,10 +76,10 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
         } = self;
 
         loop {
-            *index += 1;
-            if *index >= left_data.len() {
+            if *index + 1 >= left_data.len() {
                 break None;
             }
+            *index += 1;
             if left_data[*index].data.is_some() {
                 let (left, right_index, ..) = left_data[*index].data.take().unwrap();
                 let (right, ..) = right_data[right_index].data.take().unwrap();

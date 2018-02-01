@@ -17,6 +17,7 @@ use iterator::{BiMapIterator, BiMapRefIterator};
 use std::borrow::Borrow;
 use std::cmp;
 use std::collections::hash_map::RandomState;
+use std::fmt::Debug;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::iter;
 use std::mem;
@@ -82,8 +83,8 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
 
 impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B>
 where
-    L: Hash + Eq,
-    R: Hash + Eq,
+    L: Hash + Eq + Debug,
+    R: Hash + Eq + Debug,
     LH: BuildHasher,
     RH: BuildHasher,
     B: BitField,
@@ -237,6 +238,33 @@ where
         output
     }
 
+    /// Looks up a key in the key_data section of the hashap, and if it exists returns it from the
+    /// value_data section of the hashap. Returns the value that is associated with the key, if it
+    /// exists.
+    fn get<'a, Q: ?Sized, K, V, KH>(
+        key:&Q,
+        key_data: &[Bucket<K, usize, B>],
+        value_data: &'a [Bucket<V, usize, B>],
+        key_hasher: &KH,
+    ) -> Option<&'a V>
+    where
+        Q: Hash + Eq,
+        K: Hash + Eq + Borrow<Q>,
+        KH: BuildHasher,
+    {
+        let len = key_data.len();
+        let ideal = Self::find_ideal_index(&key, key_hasher, len);
+
+        let neighbourhood = key_data[ideal].neighbourhood;
+        neighbourhood
+            .iter()
+            .filter_map(|offset| key_data[(ideal + offset) % len].data.as_ref())
+            .filter(|&&(ref candidate_key, ..)| candidate_key.borrow() == key)
+            .filter_map(|&(_, pair_index, _)| value_data[pair_index].data.as_ref())
+            .map(|&(ref value, ..)| value)
+            .next()
+    }
+
     /// Removes a key from the key_data section of the hashmap, and removes the value from the
     /// value_data section of the hashmap. Returns the value that is associated with the key, if it
     /// exists.
@@ -260,7 +288,7 @@ where
         let neighbourhood = key_data[index].neighbourhood;
         if let Some(offset) = neighbourhood.iter().find(
             |offset| match key_data[(index + offset) % len].data {
-                Some((ref canidate_key, ..)) => canidate_key.borrow() == key,
+                Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
                 _ => false,
             },
         ) {
@@ -278,6 +306,38 @@ where
         } else {
             None
         }
+    }
+
+    /// Gets a key from the left of the hashmap. Returns the value from the right of the hashmap
+    /// that associates with this key, if it exists.
+    pub fn get_left<'a, Q: ?Sized>(&'a self, left: &Q) -> Option<&'a R>
+    where
+        L: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let &BiMap {
+            ref left_data,
+            ref right_data,
+            ref left_hasher,
+            ..
+        } = self;
+        Self::get(left, left_data, right_data, left_hasher)
+    }
+
+    /// Gets a key from the right of the hashmap. Returns the value from the left of the hashmap
+    /// that associates with this kex, if it exists.
+    pub fn get_right<'a, Q: ?Sized>(&'a self, right: &Q) -> Option<&'a L>
+    where
+        R: Borrow<Q>,
+        Q: Hash + Eq,
+    {
+        let &BiMap {
+            ref right_data,
+            ref left_data,
+            ref right_hasher,
+            ..
+        } = self;
+        Self::get(right, right_data, left_data, right_hasher)
     }
 
     /// Removes a key from the left of the hashmap. Returns the value from the right of the hashmap

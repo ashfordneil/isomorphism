@@ -2,7 +2,7 @@ extern crate bimap;
 #[macro_use]
 extern crate quickcheck;
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use bimap::BiMap;
 
@@ -45,24 +45,46 @@ quickcheck! {
 }
 
 quickcheck! {
+    fn get_after_insert(inputs: Vec<(usize, char)>, a: usize, b: char) -> bool {
+        let mut map = BiMap::new();
+
+        for (a, b) in inputs {
+            map.insert(a, b);
+        }
+
+        map.insert(a, b);
+
+        map.get_left(&a) == Some(&b) && map.get_right(&b) == Some(&a)
+    }
+}
+
+quickcheck! {
+    fn get_before_insert(inputs: Vec<(usize, char)>, a: usize, b: char) -> TestResult {
+        let mut map = BiMap::new();
+
+        map.insert(a, b);
+
+        if inputs.iter().any(|&(input_a, input_b)| a == input_a || b == input_b) {
+            TestResult::discard()
+        } else {
+            for (a, b) in inputs {
+                map.insert(a, b);
+            }
+
+            TestResult::from_bool(map.get_left(&a) == Some(&b) && map.get_right(&b) == Some(&a))
+        }
+    }
+}
+
+quickcheck! {
     fn insert(inputs: Vec<(usize, char)>) -> bool {
         let mut map = BiMap::new();
-        let mut left = HashMap::new();
-        let mut right = HashMap::new();
 
         inputs
             .into_iter()
             .all(|(a, b)| {
-                let old_b = left.insert(a, b);
-                let old_a = right.insert(b, a);
-
-                if let Some(ref b) = old_b {
-                    right.remove(b);
-                }
-
-                if let Some(ref a) = old_a {
-                    left.remove(a);
-                }
+                let old_b = map.get_left(&a).map(|&x| x);
+                let old_a = map.get_right(&b).map(|&x| x);
 
                 map.insert(a, b) == (old_b, old_a)
             })
