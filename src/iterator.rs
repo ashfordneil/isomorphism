@@ -51,7 +51,7 @@ pub struct BiMapIterator<L, R, B> {
 }
 
 impl<L, R, B> BiMapIterator<L, R, B> {
-    pub fn new(
+    pub(crate) fn new(
         left_data: Box<[Bucket<L, usize, B>]>,
         right_data: Box<[Bucket<R, usize, B>]>,
     ) -> Self {

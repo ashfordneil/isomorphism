@@ -12,25 +12,27 @@ extern crate quickcheck;
 
 pub mod bitfield;
 mod bucket;
+mod builder;
 pub mod iterator;
 
 use bitfield::{BitField, DefaultBitField};
 use bucket::Bucket;
+pub use builder::BiMapBuilder;
 use iterator::{BiMapIterator, BiMapRefIterator};
 
 use std::borrow::Borrow;
-use std::cmp;
 use std::collections::hash_map::RandomState;
 use std::fmt::Debug;
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::iter;
 use std::mem;
 
-const DEFAULT_HASH_MAP_SIZE: usize = 32;
+pub(crate) const DEFAULT_HASH_MAP_SIZE: usize = 32;
 const RESIZE_GROWTH_FACTOR: usize = 2;
 
 // left as a fraction to avoid floating point multiplication and division where it isn't needed
-const MAX_LOAD_FACTOR: f32 = 1.1;
+pub(crate) const MAX_LOAD_FACTOR: f32 = 1.1;
+
 
 /// The two way hashmap itself. See the module level documentation for more information.
 ///
@@ -50,7 +52,7 @@ pub struct BiMap<L, R, LH = RandomState, RH = RandomState, B = DefaultBitField> 
 
 impl<L, R> Default for BiMap<L, R> {
     fn default() -> Self {
-        Self::with_capacity(DEFAULT_HASH_MAP_SIZE)
+        BiMapBuilder::new().finish()
     }
 }
 
@@ -58,22 +60,6 @@ impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap.
     pub fn new() -> Self {
         Default::default()
-    }
-
-    /// Creates a new empty BiMap with a given capacity. It is guaranteed that at least capacity
-    /// elements can be inserted before the map needs to be resized.
-    pub fn with_capacity(capacity: usize) -> Self {
-        let capacity = if capacity == 0 {
-            0
-        } else {
-            (cmp::max(DEFAULT_HASH_MAP_SIZE, capacity) as f32 * MAX_LOAD_FACTOR).ceil() as usize
-        };
-        BiMap {
-            left_data: Bucket::empty_vec(capacity),
-            right_data: Bucket::empty_vec(capacity),
-            left_hasher: Default::default(),
-            right_hasher: Default::default(),
-        }
     }
 }
 

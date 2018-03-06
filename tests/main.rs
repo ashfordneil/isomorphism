@@ -4,13 +4,13 @@ extern crate quickcheck;
 
 use std::collections::HashSet;
 
-use bimap::BiMap;
+use bimap::{BiMap, BiMapBuilder};
 
 use quickcheck::TestResult;
 
 quickcheck! {
     fn test_capacity(cap: usize) -> bool {
-        BiMap::<(), ()>::with_capacity(cap).capacity() >= cap
+        BiMapBuilder::new().capacity(cap).finish::<(), ()>().capacity() >= cap
     }
 }
 
