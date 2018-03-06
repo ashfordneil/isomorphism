@@ -6,6 +6,10 @@
 //! implement it. I'm hoping that the hopscotch hashing algorithm will also make removals from the
 //! hashmaps more efficient.
 
+#[cfg(test)]
+#[macro_use]
+extern crate quickcheck;
+
 pub mod bitfield;
 mod bucket;
 pub mod iterator;
@@ -242,7 +246,7 @@ where
     /// value_data section of the hashap. Returns the value that is associated with the key, if it
     /// exists.
     fn get<'a, Q: ?Sized, K, V, KH>(
-        key:&Q,
+        key: &Q,
         key_data: &[Bucket<K, usize, B>],
         value_data: &'a [Bucket<V, usize, B>],
         key_hasher: &KH,
@@ -286,12 +290,12 @@ where
         let index = Self::find_ideal_index(&key, key_hasher, len);
 
         let neighbourhood = key_data[index].neighbourhood;
-        if let Some(offset) = neighbourhood.iter().find(
-            |offset| match key_data[(index + offset) % len].data {
+        if let Some(offset) = neighbourhood.iter().find(|offset| {
+            match key_data[(index + offset) % len].data {
                 Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
                 _ => false,
-            },
-        ) {
+            }
+        }) {
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
             let (key, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
             let (value, ..) = value_data[value_index].data.take().unwrap();

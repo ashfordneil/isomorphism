@@ -39,9 +39,7 @@ where
         } = self;
         left_data
             .filter_map(|bucket| bucket.data.as_ref())
-            .map(|&(ref key, value, _)| {
-                (key, &right_data[value].data.as_ref().unwrap().0)
-            })
+            .map(|&(ref key, value, _)| (key, &right_data[value].data.as_ref().unwrap().0))
             .next()
     }
 }
@@ -76,16 +74,16 @@ impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
         } = self;
 
         loop {
-            if *index + 1 >= left_data.len() {
+            if *index >= left_data.len() {
                 break None;
             }
-            *index += 1;
             if left_data[*index].data.is_some() {
                 let (left, right_index, ..) = left_data[*index].data.take().unwrap();
                 let (right, ..) = right_data[right_index].data.take().unwrap();
+                *index += 1;
                 break Some((left, right));
             }
+            *index += 1;
         }
     }
 }
-

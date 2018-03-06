@@ -78,8 +78,6 @@ where
     }
 }
 
-
-
 impl<T> BitField for T
 where
     T: BitSized
@@ -121,18 +119,32 @@ pub type DefaultBitField = u32;
 mod test {
     use BitField;
 
-    #[test]
-    fn test_basics() {
-        assert_eq!(u8::one_at(3), 8);
-        assert_eq!(u8::zero_at(3), 247);
+    use quickcheck::TestResult;
+
+    quickcheck! {
+        fn one_at(index: usize) -> TestResult {
+            if index >= u64::size() {
+                TestResult::discard()
+            } else {
+                TestResult::from_bool(u64::one_at(index).iter().collect::<Vec<_>>() == vec![index])
+            }
+        }
     }
 
-    #[test]
-    fn test_iterator() {
-        assert_eq!(
-            0xBEEFu16.iter().collect::<Vec<_>>(),
-            vec![0, 1, 2, 3, 5, 6, 7, 9, 10, 11, 12, 13, 15]
-        )
+    quickcheck! {
+        fn iterator_results_are_ordered(input: u32) -> bool {
+            let bits: Vec<_> = input.iter().collect();
+            bits[..].windows(2).all(|window| {
+                window[0] < window[1]
+            })
+        }
+    }
+
+    quickcheck! {
+        fn iterator_results_equal_number(input: u32) -> bool {
+            input == input.iter()
+                .map(|x| 1 << x)
+                .fold(0, |x, y| x + y)
+        }
     }
 }
-

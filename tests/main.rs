@@ -90,3 +90,43 @@ quickcheck! {
             })
     }
 }
+
+quickcheck! {
+    fn iterate_by_ref(inputs: Vec<(usize, char)>) -> bool {
+        let mut map = BiMap::new();
+
+        for (a, b) in inputs {
+            map.insert(a, b);
+        }
+
+        for (a, b) in &map {
+            if map.get_left(a) != Some(b) || map.get_right(b) != Some(a) {
+                println!("Failure");
+                println!("{:?}", map);
+                println!("left: expected {0} => {1:?}, got {0} => {2:?}", a, Some(b), map.get_left(a));
+                println!("right: expected {0} => {1:?}, got {0} => {2:?}", b, Some(a), map.get_right(b));
+                return false;
+            }
+        }
+
+        true
+    }
+}
+
+quickcheck! {
+    fn iterate(inputs: Vec<(usize, char)>) -> bool {
+        let mut map = BiMap::new();
+
+        for (a, b) in inputs {
+            map.insert(a, b);
+        }
+
+        let mut refs: Vec<_> = (&map).into_iter().map(|(&a, &b)| (a, b)).collect();
+        let mut vals: Vec<_> = map.into_iter().collect();
+
+        refs.sort();
+        vals.sort();
+
+        refs == vals
+    }
+}
