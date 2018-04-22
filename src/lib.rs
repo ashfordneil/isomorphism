@@ -10,6 +10,11 @@
 #[macro_use]
 extern crate quickcheck;
 
+#[cfg(feature = "serde")]
+extern crate serde;
+#[cfg(feature = "serde")]
+use serde::{Serialize, Serializer, Deserialize, Deserializer};
+
 pub mod bitfield;
 mod bucket;
 mod builder;
@@ -18,13 +23,12 @@ mod iterator;
 use bitfield::{BitField, DefaultBitField};
 use bucket::Bucket;
 pub use builder::BiMapBuilder;
-pub use iterator::{Iter, IntoIter};
+pub use iterator::{IntoIter, Iter};
 
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
-use std::fmt::Debug;
 use std::hash::{BuildHasher, Hash, Hasher};
-use std::iter;
+use std::iter::{self, Extend, FromIterator};
 use std::mem;
 
 pub(crate) const DEFAULT_HASH_MAP_SIZE: usize = 32;
@@ -78,8 +82,8 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
 
 impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B>
 where
-    L: Hash + Eq + Debug,
-    R: Hash + Eq + Debug,
+    L: Hash + Eq,
+    R: Hash + Eq,
     LH: BuildHasher,
     RH: BuildHasher,
     B: BitField,
@@ -164,7 +168,7 @@ where
         key: K,
         key_data: &mut [Bucket<K, usize, B>],
         value_data: &mut [Bucket<V, usize, B>],
-        hasher: &H
+        hasher: &H,
     ) -> Result<usize, K> {
         let len = key_data.len();
         let ideal_index = Self::find_ideal_index(&key, hasher, len);
@@ -220,7 +224,7 @@ where
                             // finish our insert and return
                             Self::mark_as_full(ideal_index, index, key_data);
                             Ok(index)
-                        },
+                        }
                         Err(new_key) => {
                             // the replacement failed - undo our insert
                             let (key, _, _) = key_data[index].data.take().unwrap();
@@ -274,7 +278,12 @@ where
 
         // attempt to insert, hold onto the keys if it fails
         let failure: Option<(L, R)> = {
-            let &mut BiMap { ref mut left_data, ref mut right_data, ref left_hasher, ref right_hasher } = self;
+            let &mut BiMap {
+                ref mut left_data,
+                ref mut right_data,
+                ref left_hasher,
+                ref right_hasher,
+            } = self;
             match Self::insert_one_sided(left, left_data, right_data, left_hasher) {
                 Ok(left_index) => {
                     match Self::insert_one_sided(right, right_data, left_data, right_hasher) {
@@ -287,17 +296,15 @@ where
                                 right_data[right_index].data.as_mut().unwrap();
                             *paired_left_index = left_index;
                             None
-                        },
+                        }
                         Err(right) => {
                             let (left, _, left_ideal) = left_data[left_index].data.take().unwrap();
                             Self::mark_as_empty(left_ideal, left_index, left_data);
                             Some((left, right))
-                        },
+                        }
                     }
-                },
-                Err(left) => {
-                    Some((left, right))
                 }
+                Err(left) => Some((left, right)),
             }
         };
 
@@ -487,6 +494,115 @@ impl<L, R, LH, RH, B> IntoIterator for BiMap<L, R, LH, RH, B> {
             ..
         } = self;
         IntoIter::new(left_data, right_data)
+    }
+}
+
+impl<L, R, LH, RH, B> FromIterator<(L, R)> for BiMap<L, R, LH, RH, B>
+where
+    L: Hash + Eq,
+    R: Hash + Eq,
+    LH: BuildHasher + Default,
+    RH: BuildHasher + Default,
+    B: BitField,
+{
+    fn from_iter<T: IntoIterator<Item = (L, R)>>(iter: T) -> Self {
+        let mut output = BiMapBuilder::new()
+            .left_hasher(Default::default())
+            .right_hasher(Default::default())
+            .bitfield::<B>()
+            .finish();
+        output.extend(iter);
+        output
+    }
+}
+
+impl<L, R, LH, RH, B> Extend<(L, R)> for BiMap<L, R, LH, RH, B>
+where
+    L: Hash + Eq,
+    R: Hash + Eq,
+    LH: BuildHasher,
+    RH: BuildHasher,
+    B: BitField,
+{
+    fn extend<T: IntoIterator<Item = (L, R)>>(&mut self, iter: T) {
+        for (left, right) in iter {
+            self.insert(left, right);
+        }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<L, R, LH, RH, B> Serialize for BiMap<L, R, LH, RH, B>
+where
+    L: Serialize,
+    R: Serialize,
+{
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        use serde::ser::SerializeSeq;
+
+        let mut seq = serializer.serialize_seq(None)?;
+        for (ref left, ref right) in self.iter() {
+            seq.serialize_element(&(left, right))?;
+        }
+
+        seq.end()
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, L, R, LH, RH, B> Deserialize<'de> for BiMap<L, R, LH, RH, B>
+where
+    L: Hash + Eq + Deserialize<'de>,
+    R: Hash + Eq + Deserialize<'de>,
+    LH: BuildHasher + Default,
+    RH: BuildHasher + Default,
+    B: BitField,
+{
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use std::fmt;
+        use std::marker::PhantomData;
+
+        use serde::de::{MapAccess, Visitor};
+
+        struct MapVisitor<L, R, LH, RH, B> {
+            marker: PhantomData<BiMap<L, R, LH, RH, B>>,
+        }
+
+        impl<'de, L, R, LH, RH, B> Visitor<'de> for MapVisitor<L, R, LH, RH, B>
+        where
+            L: Hash + Eq + Deserialize<'de>,
+            R: Hash + Eq + Deserialize<'de>,
+            LH: BuildHasher + Default,
+            RH: BuildHasher + Default,
+            B: BitField,
+        {
+            type Value = BiMap<L, R, LH, RH, B>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("a map")
+            }
+
+            fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
+                let builder = BiMapBuilder::new()
+                    .left_hasher(Default::default())
+                    .right_hasher(Default::default())
+                    .bitfield::<B>();
+                let mut output = if let Some(size) = map.size_hint() {
+                    builder.capacity(size).finish()
+                } else {
+                    builder.finish()
+                };
+
+                while let Some((left, right)) = map.next_entry()? {
+                    output.insert(left, right);
+                }
+
+                Ok(output)
+            }
+        }
+
+        let visitor = MapVisitor { marker: PhantomData };
+        deserializer.deserialize_map(visitor)
     }
 }
 

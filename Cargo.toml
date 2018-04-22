@@ -3,7 +3,9 @@ authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "bimap"
 version = "0.1.0"
 
-[dependencies]
+[dependencies.serde]
+version = "1.0.42"
+optional = true
 
 [dev-dependencies]
 quickcheck = "0.6.0"
