@@ -13,7 +13,7 @@ extern crate quickcheck;
 #[cfg(feature = "serde")]
 extern crate serde;
 #[cfg(feature = "serde")]
-use serde::{Serialize, Serializer, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub mod bitfield;
 mod bucket;
@@ -27,6 +27,7 @@ pub use iterator::{IntoIter, Iter};
 
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
+use std::fmt::{self, Debug};
 use std::hash::{BuildHasher, Hash, Hasher};
 use std::iter::{self, Extend, FromIterator};
 use std::mem;
@@ -41,8 +42,9 @@ pub(crate) const MAX_LOAD_FACTOR: f32 = 1.1;
 ///
 /// L and R are the left and right types being mapped to eachother. LH and RH are the hash builders
 /// used to hash the left keys and right keys. B is the bitfield used to store neighbourhoods.
-#[derive(Debug)]
 pub struct BiMap<L, R, LH = RandomState, RH = RandomState, B = DefaultBitField> {
+    /// The number of pairs inside the map
+    len: usize,
     /// All of the left keys, and the locations of their pairs within the right_data array.
     left_data: Box<[Bucket<L, usize, B>]>,
     /// All of the right keys, and the locations of their pairs within the left_data array.
@@ -71,6 +73,11 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// to be resized.
     pub fn capacity(&self) -> usize {
         (self.left_data.len() as f32 / MAX_LOAD_FACTOR).floor() as usize
+    }
+
+    /// Returns the number of pairs inside this hashmap.
+    pub fn len(&self) -> usize {
+        self.len
     }
 
     /// An iterator visiting all key-value pairs in an arbitrary order. The iterator element is
@@ -135,6 +142,22 @@ where
                 let &(_, pair_value, _) = self.left_data[value].data.as_ref().unwrap();
                 assert_eq!(pair_value, i);
             });
+
+        // check length reporting holds
+        assert_eq!(
+            self.left_data
+                .iter()
+                .filter(|bucket| bucket.data.is_some())
+                .count(),
+            self.len()
+        );
+        assert_eq!(
+            self.right_data
+                .iter()
+                .filter(|bucket| bucket.data.is_some())
+                .count(),
+            self.len()
+        );
     }
 
     /// Finds the ideal position of a key within the hashmap.
@@ -251,25 +274,38 @@ where
 
         let output = {
             let &mut BiMap {
+                ref mut len,
                 ref mut left_data,
                 ref mut right_data,
                 ref left_hasher,
                 ref right_hasher,
             } = self;
-            match Self::remove(&left, left_data, right_data, left_hasher, right_hasher) {
+            match Self::remove(&left, left_data, right_data, left_hasher, right_hasher, len) {
                 Some((old_left, old_right)) => if old_right == right {
                     (Some(old_right), Some(old_left))
                 } else {
                     (
                         Some(old_right),
-                        Self::remove(&right, right_data, left_data, right_hasher, left_hasher)
-                            .map(|(_key, value)| value),
+                        Self::remove(
+                            &right,
+                            right_data,
+                            left_data,
+                            right_hasher,
+                            left_hasher,
+                            len,
+                        ).map(|(_key, value)| value),
                     )
                 },
                 None => (
                     None,
-                    Self::remove(&right, right_data, left_data, right_hasher, left_hasher)
-                        .map(|(_key, value)| value),
+                    Self::remove(
+                        &right,
+                        right_data,
+                        left_data,
+                        right_hasher,
+                        left_hasher,
+                        len,
+                    ).map(|(_key, value)| value),
                 ),
             }
         };
@@ -283,6 +319,7 @@ where
                 ref mut right_data,
                 ref left_hasher,
                 ref right_hasher,
+                ..
             } = self;
             match Self::insert_one_sided(left, left_data, right_data, left_hasher) {
                 Ok(left_index) => {
@@ -308,10 +345,15 @@ where
             }
         };
 
+        if failure.is_none() {
+            self.len += 1;
+        }
+
         self.invariants();
 
         if let Some((left, right)) = failure {
             // resize, as we were unable to insert
+            self.len = 0;
             let capacity = self.left_data.len() * RESIZE_GROWTH_FACTOR;
             let old_left_data = mem::replace(&mut self.left_data, Bucket::empty_vec(capacity));
             let old_right_data = mem::replace(&mut self.right_data, Bucket::empty_vec(capacity));
@@ -364,6 +406,7 @@ where
         value_data: &mut [Bucket<V, usize, B>],
         key_hasher: &KH,
         value_hasher: &VH,
+        map_len: &mut usize,
     ) -> Option<(K, V)>
     where
         Q: Hash + Eq,
@@ -391,6 +434,8 @@ where
 
             value_data[ideal_value_index].neighbourhood =
                 value_data[ideal_value_index].neighbourhood & B::zero_at(value_offset);
+
+            *map_len -= 1;
 
             Some((key, value))
         } else {
@@ -441,12 +486,13 @@ where
     {
         self.invariants();
         let &mut BiMap {
+            ref mut len,
             ref mut left_data,
             ref mut right_data,
             ref left_hasher,
             ref right_hasher,
         } = self;
-        Self::remove(left, left_data, right_data, left_hasher, right_hasher)
+        Self::remove(left, left_data, right_data, left_hasher, right_hasher, len)
             .map(|(_key, value)| value)
     }
 
@@ -459,13 +505,50 @@ where
     {
         self.invariants();
         let &mut BiMap {
+            ref mut len,
             ref mut left_data,
             ref mut right_data,
             ref left_hasher,
             ref right_hasher,
         } = self;
-        Self::remove(right, right_data, left_data, right_hasher, left_hasher)
+        Self::remove(right, right_data, left_data, right_hasher, left_hasher, len)
             .map(|(_key, value)| value)
+    }
+}
+
+impl<L, R, LH, RH, B> PartialEq for BiMap<L, R, LH, RH, B>
+where
+    L: Hash + Eq,
+    R: Hash + Eq,
+    LH: BuildHasher,
+    RH: BuildHasher,
+    B: BitField,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.len() == other.len() && self.iter().all(|(left, right)| {
+            other.get_left(left).map_or(false, |r| *right == *r)
+                && other.get_right(right).map_or(false, |l| *left == *l)
+        })
+    }
+}
+
+impl<L, R, LH, RH, B> Eq for BiMap<L, R, LH, RH, B>
+where
+    L: Hash + Eq,
+    R: Hash + Eq,
+    LH: BuildHasher,
+    RH: BuildHasher,
+    B: BitField,
+{
+}
+
+impl<L, R, LH, RH, B> Debug for BiMap<L, R, LH, RH, B>
+where
+    L: Debug,
+    R: Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_map().entries(self.iter()).finish()
     }
 }
 
@@ -540,7 +623,7 @@ where
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         use serde::ser::SerializeSeq;
 
-        let mut seq = serializer.serialize_seq(None)?;
+        let mut seq = serializer.serialize_seq(Some(self.len))?;
         for (ref left, ref right) in self.iter() {
             seq.serialize_element(&(left, right))?;
         }
@@ -601,7 +684,9 @@ where
             }
         }
 
-        let visitor = MapVisitor { marker: PhantomData };
+        let visitor = MapVisitor {
+            marker: PhantomData,
+        };
         deserializer.deserialize_map(visitor)
     }
 }

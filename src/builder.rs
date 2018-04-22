@@ -78,6 +78,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
             cap => (cmp::max(DEFAULT_HASH_MAP_SIZE, cap) as f32 * MAX_LOAD_FACTOR).ceil() as usize,
         };
         BiMap {
+            len: 0,
             left_data: Bucket::empty_vec(capacity),
             right_data: Bucket::empty_vec(capacity),
             left_hasher: self.left_hasher,
