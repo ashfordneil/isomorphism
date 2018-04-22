@@ -79,6 +79,55 @@ where
     RH: BuildHasher,
     B: BitField,
 {
+    /// check the invariants of this hashmap, panicking if they are not met
+    fn invariants(&self) {
+        // check lengths
+        assert_eq!(self.left_data.len(), self.right_data.len());
+        let len = self.left_data.len();
+
+        // check ideal indexes are stored correctly (in the bucket and its ideal bucket's bitfield)
+        self.left_data
+            .iter()
+            .enumerate()
+            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
+            .for_each(|(i, &(ref key, _value, ideal))| {
+                assert_eq!(Self::find_ideal_index(key, &self.left_hasher, len), ideal);
+                assert!(
+                    (self.left_data[ideal].neighbourhood | B::zero_at((len + i - ideal) % len))
+                        .full()
+                );
+            });
+        self.right_data
+            .iter()
+            .enumerate()
+            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
+            .for_each(|(i, &(ref key, _value, ideal))| {
+                assert_eq!(Self::find_ideal_index(key, &self.right_hasher, len), ideal);
+                assert!(
+                    (self.right_data[ideal].neighbourhood | B::zero_at((len + i - ideal) % len))
+                        .full()
+                );
+            });
+
+        // check matches exist
+        self.left_data
+            .iter()
+            .enumerate()
+            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
+            .for_each(|(i, &(ref _key, value, _ideal))| {
+                let &(_, pair_value, _) = self.right_data[value].data.as_ref().unwrap();
+                assert_eq!(pair_value, i);
+            });
+        self.right_data
+            .iter()
+            .enumerate()
+            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
+            .for_each(|(i, &(ref _key, value, _ideal))| {
+                let &(_, pair_value, _) = self.left_data[value].data.as_ref().unwrap();
+                assert_eq!(pair_value, i);
+            });
+    }
+
     /// Finds the ideal position of a key within the hashmap.
     fn find_ideal_index<K: Hash, H: BuildHasher>(key: &K, hasher: &H, len: usize) -> usize {
         let mut hasher = hasher.build_hasher();
@@ -160,6 +209,8 @@ where
     /// `Option<R>` is the value that was previously associated with the inserted L (or lack
     /// thereof), and vice versa for the `Option<L>`.
     pub fn insert(&mut self, left: L, right: R) -> (Option<R>, Option<L>) {
+        self.invariants();
+
         let output = {
             let &mut BiMap {
                 ref mut left_data,
@@ -185,6 +236,7 @@ where
             }
         };
 
+        self.invariants();
         let left_ideal_index =
             Self::find_ideal_index(&left, &self.left_hasher, self.left_data.len());
         let right_ideal_index =
@@ -206,6 +258,7 @@ where
             }
         };
 
+        self.invariants();
         if let Some((left_index, right_index)) = insert_indexes {
             Self::mark_as_full(left_ideal_index, left_index, &mut self.left_data);
             Self::mark_as_full(right_ideal_index, right_index, &mut self.right_data);
@@ -224,6 +277,8 @@ where
                     self.insert(left, right);
                 });
         }
+
+        self.invariants();
 
         output
     }
@@ -305,6 +360,7 @@ where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
+        self.invariants();
         let &BiMap {
             ref left_data,
             ref right_data,
@@ -321,6 +377,7 @@ where
         R: Borrow<Q>,
         Q: Hash + Eq,
     {
+        self.invariants();
         let &BiMap {
             ref right_data,
             ref left_data,
@@ -337,6 +394,7 @@ where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
+        self.invariants();
         let &mut BiMap {
             ref mut left_data,
             ref mut right_data,
@@ -354,6 +412,7 @@ where
         R: Borrow<Q>,
         Q: Hash + Eq,
     {
+        self.invariants();
         let &mut BiMap {
             ref mut left_data,
             ref mut right_data,
