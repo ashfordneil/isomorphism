@@ -3,7 +3,7 @@ use bucket::Bucket;
 use std::iter::Iterator;
 use std::slice;
 
-pub struct BiMapRefIterator<'a, L, R, B>
+pub struct Iter<'a, L, R, B>
 where
     L: 'a,
     R: 'a,
@@ -13,19 +13,19 @@ where
     right_data: &'a [Bucket<R, usize, B>],
 }
 
-impl<'a, L, R, B> BiMapRefIterator<'a, L, R, B> {
+impl<'a, L, R, B> Iter<'a, L, R, B> {
     pub fn new(
         left_data: slice::Iter<'a, Bucket<L, usize, B>>,
         right_data: &'a [Bucket<R, usize, B>],
     ) -> Self {
-        BiMapRefIterator {
+        Iter {
             left_data,
             right_data,
         }
     }
 }
 
-impl<'a, L, R, B> Iterator for BiMapRefIterator<'a, L, R, B>
+impl<'a, L, R, B> Iterator for Iter<'a, L, R, B>
 where
     L: 'a,
     R: 'a,
@@ -33,7 +33,7 @@ where
     type Item = (&'a L, &'a R);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let &mut BiMapRefIterator {
+        let &mut Iter {
             ref mut left_data,
             right_data,
         } = self;
@@ -44,18 +44,18 @@ where
     }
 }
 
-pub struct BiMapIterator<L, R, B> {
+pub struct IntoIter<L, R, B> {
     left_data: Box<[Bucket<L, usize, B>]>,
     right_data: Box<[Bucket<R, usize, B>]>,
     index: usize,
 }
 
-impl<L, R, B> BiMapIterator<L, R, B> {
+impl<L, R, B> IntoIter<L, R, B> {
     pub(crate) fn new(
         left_data: Box<[Bucket<L, usize, B>]>,
         right_data: Box<[Bucket<R, usize, B>]>,
     ) -> Self {
-        BiMapIterator {
+        IntoIter {
             left_data,
             right_data,
             index: 0,
@@ -63,11 +63,11 @@ impl<L, R, B> BiMapIterator<L, R, B> {
     }
 }
 
-impl<L, R, B> Iterator for BiMapIterator<L, R, B> {
+impl<L, R, B> Iterator for IntoIter<L, R, B> {
     type Item = (L, R);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let &mut BiMapIterator {
+        let &mut IntoIter {
             ref mut left_data,
             ref mut right_data,
             ref mut index,

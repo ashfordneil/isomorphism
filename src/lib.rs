@@ -13,12 +13,12 @@ extern crate quickcheck;
 pub mod bitfield;
 mod bucket;
 mod builder;
-pub mod iterator;
+mod iterator;
 
 use bitfield::{BitField, DefaultBitField};
 use bucket::Bucket;
 pub use builder::BiMapBuilder;
-use iterator::{BiMapIterator, BiMapRefIterator};
+pub use iterator::{Iter, IntoIter};
 
 use std::borrow::Borrow;
 use std::collections::hash_map::RandomState;
@@ -67,6 +67,12 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// to be resized.
     pub fn capacity(&self) -> usize {
         (self.left_data.len() as f32 / MAX_LOAD_FACTOR).floor() as usize
+    }
+
+    /// An iterator visiting all key-value pairs in an arbitrary order. The iterator element is
+    /// type (&'a L, &'a R).
+    pub fn iter(&self) -> Iter<L, R, B> {
+        self.into_iter()
     }
 }
 
@@ -304,7 +310,7 @@ where
             let old_right_data = mem::replace(&mut self.right_data, Bucket::empty_vec(capacity));
 
             iter::once((left, right))
-                .chain(BiMapIterator::new(old_left_data, old_right_data))
+                .chain(IntoIter::new(old_left_data, old_right_data))
                 .for_each(|(left, right)| {
                     self.insert(left, right);
                 });
@@ -458,7 +464,7 @@ where
 
 impl<'a, L, R, LH, RH, B> IntoIterator for &'a BiMap<L, R, LH, RH, B> {
     type Item = (&'a L, &'a R);
-    type IntoIter = BiMapRefIterator<'a, L, R, B>;
+    type IntoIter = Iter<'a, L, R, B>;
 
     fn into_iter(self) -> Self::IntoIter {
         let &BiMap {
@@ -466,13 +472,13 @@ impl<'a, L, R, LH, RH, B> IntoIterator for &'a BiMap<L, R, LH, RH, B> {
             ref right_data,
             ..
         } = self;
-        BiMapRefIterator::new(left_data.iter(), right_data)
+        Iter::new(left_data.iter(), right_data)
     }
 }
 
 impl<L, R, LH, RH, B> IntoIterator for BiMap<L, R, LH, RH, B> {
     type Item = (L, R);
-    type IntoIter = BiMapIterator<L, R, B>;
+    type IntoIter = IntoIter<L, R, B>;
 
     fn into_iter(self) -> Self::IntoIter {
         let BiMap {
@@ -480,7 +486,7 @@ impl<L, R, LH, RH, B> IntoIterator for BiMap<L, R, LH, RH, B> {
             right_data,
             ..
         } = self;
-        BiMapIterator::new(left_data, right_data)
+        IntoIter::new(left_data, right_data)
     }
 }
 
