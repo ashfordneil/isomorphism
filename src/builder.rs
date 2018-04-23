@@ -1,4 +1,4 @@
-use ::{BiMap, DEFAULT_HASH_MAP_SIZE, MAX_LOAD_FACTOR};
+use {BiMap, DEFAULT_HASH_MAP_SIZE, MAX_LOAD_FACTOR};
 use bitfield::{BitField, DefaultBitField};
 use bucket::Bucket;
 

@@ -1,7 +1,9 @@
+//! Definitions of bitfield things for hashmap neighbourhoods.
 use std::iter::Iterator;
-use std::ops::{BitAnd, BitOr, Not, Shl, Shr};
+use std::ops::{BitAnd, BitOr, Shr};
 
-/// A bit field trait for use in hashmap buckets.
+/// A bit field trait for use in hashmap buckets. See the `bitfield` method of `BiMapBuilder` for
+/// more information.
 pub trait BitField: BitAnd<Output = Self> + BitOr<Output = Self> + Copy + Sized {
     /// See the documentation for the `iter` function.
     type Iter: Iterator<Item = usize>;
@@ -23,36 +25,78 @@ pub trait BitField: BitAnd<Output = Self> + BitOr<Output = Self> + Copy + Sized 
     fn full(&self) -> bool;
 }
 
-/// Helper trait to reduce code duplication when implementing Bitfield for integer types.
-pub trait BitSized {
-    /// Returns how many bits are in the type.
-    fn size() -> usize;
-}
+mod private {
+    use super::{BitField, BitFieldIterator};
 
-impl BitSized for u8 {
-    fn size() -> usize {
-        8
+    use std::ops::{BitAnd, BitOr, Not, Shl, Shr};
+
+    /// Helper trait to reduce code duplication when implementing Bitfield for integer types.
+    pub trait BitSized {
+        /// Returns how many bits are in the type.
+        fn size() -> usize;
+    }
+
+    impl BitSized for u8 {
+        fn size() -> usize {
+            8
+        }
+    }
+
+    impl BitSized for u16 {
+        fn size() -> usize {
+            16
+        }
+    }
+
+    impl BitSized for u32 {
+        fn size() -> usize {
+            32
+        }
+    }
+
+    impl BitSized for u64 {
+        fn size() -> usize {
+            64
+        }
+    }
+
+    impl<T> BitField for T
+    where
+        T: BitSized
+            + BitAnd<Output = T>
+            + BitOr<Output = T>
+            + Eq
+            + Not<Output = T>
+            + Shl<usize, Output = T>
+            + Shr<usize, Output = T>
+            + From<u8>
+            + Copy,
+    {
+        type Iter = BitFieldIterator<T>;
+
+        fn size() -> usize {
+            <T as BitSized>::size()
+        }
+
+        fn one_at(index: usize) -> Self {
+            Self::from(1) << index
+        }
+
+        fn zero_at(index: usize) -> Self {
+            !Self::one_at(index)
+        }
+
+        fn iter(&self) -> Self::Iter {
+            BitFieldIterator(*self, 0)
+        }
+
+        fn full(&self) -> bool {
+            *self == Self::one_at(0) | Self::zero_at(0)
+        }
     }
 }
 
-impl BitSized for u16 {
-    fn size() -> usize {
-        16
-    }
-}
-
-impl BitSized for u32 {
-    fn size() -> usize {
-        32
-    }
-}
-
-impl BitSized for u64 {
-    fn size() -> usize {
-        64
-    }
-}
-
+/// An iterator over the active bits in a bitfield.
 pub struct BitFieldIterator<T>(T, usize);
 
 impl<T> Iterator for BitFieldIterator<T>
@@ -78,41 +122,7 @@ where
     }
 }
 
-impl<T> BitField for T
-where
-    T: BitSized
-        + BitAnd<Output = T>
-        + BitOr<Output = T>
-        + Eq
-        + Not<Output = T>
-        + Shl<usize, Output = T>
-        + Shr<usize, Output = T>
-        + From<u8>
-        + Copy,
-{
-    type Iter = BitFieldIterator<T>;
-
-    fn size() -> usize {
-        <T as BitSized>::size()
-    }
-
-    fn one_at(index: usize) -> Self {
-        Self::from(1) << index
-    }
-
-    fn zero_at(index: usize) -> Self {
-        !Self::one_at(index)
-    }
-
-    fn iter(&self) -> Self::Iter {
-        BitFieldIterator(*self, 0)
-    }
-
-    fn full(&self) -> bool {
-        *self == Self::one_at(0) | Self::zero_at(0)
-    }
-}
-
+/// The default bitfield type.
 pub type DefaultBitField = u32;
 
 #[cfg(test)]

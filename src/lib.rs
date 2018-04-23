@@ -2,9 +2,11 @@
 //! This crate aims to provide a data structure that can take store a 1:1 relation between two
 //! different types, and provide constant time lookup within this relation.
 //!
-//! The hashmaps in this crate use the hopscotch hashing algorithm, mainly because I just wanted to
-//! implement it. I'm hoping that the hopscotch hashing algorithm will also make removals from the
-//! hashmaps more efficient.
+//! Unlike a regular hashmap, which provides lookups from "keys" to "values", the two directional
+//! hashmap provides lookups from "left keys" to "right keys" and from "right keys" to "left keys".
+//! The difference between a "value" in a hashmap and a "right key" in a `BiMap` is that the right
+//! key must be hashable and comparable, and that duplicate right keys cannot exist within the
+//! bimap, even if they have different left keys mapping to them.
 
 #[cfg(test)]
 #[macro_use]
@@ -38,7 +40,8 @@ const RESIZE_GROWTH_FACTOR: usize = 2;
 // left as a fraction to avoid floating point multiplication and division where it isn't needed
 pub(crate) const MAX_LOAD_FACTOR: f32 = 1.1;
 
-/// The two way hashmap itself. See the crate level documentation for more information.
+/// The two way hashmap itself. See the crate level documentation for more information. Uses
+/// hopscotch hashing internally.
 ///
 /// L and R are the left and right types being mapped to eachother. LH and RH are the hash builders
 /// used to hash the left keys and right keys. B is the bitfield used to store neighbourhoods.

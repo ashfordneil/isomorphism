@@ -3,6 +3,7 @@ use bucket::Bucket;
 use std::iter::Iterator;
 use std::slice;
 
+/// An iterator over the pairs stored in a BiMap.
 pub struct Iter<'a, L, R, B>
 where
     L: 'a,
@@ -44,6 +45,7 @@ where
     }
 }
 
+/// An owning iterator over the pairs stored in a BiMap.
 pub struct IntoIter<L, R, B> {
     left_data: Box<[Bucket<L, usize, B>]>,
     right_data: Box<[Bucket<R, usize, B>]>,
