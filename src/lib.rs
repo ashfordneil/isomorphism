@@ -68,7 +68,7 @@ impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let map: BiMap<u64, char> = BiMap::new();
     /// ```
     pub fn new() -> Self {
@@ -81,7 +81,7 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// to be resized.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let map: BiMap<String, String> = BiMap::new();
     /// let capacity = map.capacity();
     /// assert!(capacity >= 0);
@@ -95,7 +95,7 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// keys being inserted already existed and were associated with other pairs.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// assert_eq!(0, map.len());
     ///
@@ -115,7 +115,7 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// Returns true if the bimap contains no pairs.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// assert!(map.is_empty());
     ///
@@ -130,7 +130,7 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// type (&'a L, &'a R).
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// map.insert("Hello", "World");
     /// map.insert("Hashmaps", "Are cool");
@@ -328,7 +328,7 @@ where
     /// thereof), and vice versa for the `Option<L>`.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     ///
     /// // neither "Hello" nor 5 were previously mapped to anything, so nothing is returned.
@@ -521,7 +521,7 @@ where
     /// that associates with this key, if it exists.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// assert_eq!(None, map.get_left("Hello"));
     ///
@@ -547,7 +547,7 @@ where
     /// that associates with this key, if it exists.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// assert_eq!(None, map.get_right(&5));
     ///
@@ -575,7 +575,7 @@ where
     /// associated with the key that is removed.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// map.insert("Hello", 5);
     ///
@@ -611,7 +611,7 @@ where
     /// associated with the key that is removed.
     ///
     /// ```
-    /// # use bimap::BiMap;
+    /// # use isomorphism::BiMap;
     /// let mut map = BiMap::new();
     /// map.insert("Hello", 5);
     ///

@@ -1,10 +1,10 @@
-extern crate bimap;
+extern crate isomorphism;
 #[macro_use]
 extern crate quickcheck;
 
 use std::collections::HashSet;
 
-use bimap::{BiMap, BiMapBuilder};
+use isomorphism::{BiMap, BiMapBuilder};
 
 use quickcheck::TestResult;
 

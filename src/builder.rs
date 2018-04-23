@@ -31,7 +31,7 @@ impl BiMapBuilder<RandomState, RandomState, DefaultBitField> {
     /// Create new builder, ready to be configured.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// let map: BiMap<String, String> = BiMapBuilder::new().finish();
     /// ```
     pub fn new() -> Self {
@@ -46,7 +46,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
     /// to a large number of hash collisions.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// let map: BiMap<String, String> = BiMapBuilder::new().capacity(1024).finish();
     /// ```
     pub fn capacity(self, capacity: usize) -> Self {
@@ -59,7 +59,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
     /// performance issues, so do so with care.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// use std::collections::hash_map::RandomState;
     ///
     /// let map: BiMap<String, String> = BiMapBuilder::new()
@@ -81,7 +81,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
     /// performance issues, so do so with care.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// use std::collections::hash_map::RandomState;
     ///
     /// let map: BiMap<String, String> = BiMapBuilder::new()
@@ -105,7 +105,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
     /// control the expected number of cache misses needed to do a lookup.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// let map: BiMap<String, String, _, _, u16> = BiMapBuilder::new()
     ///             .bitfield::<u16>()
     ///             .finish();
@@ -123,7 +123,7 @@ impl<LH: BuildHasher, RH: BuildHasher, B: BitField> BiMapBuilder<LH, RH, B> {
     /// configurations.
     ///
     /// ```
-    /// # use bimap::{BiMap, BiMapBuilder};
+    /// # use isomorphism::{BiMap, BiMapBuilder};
     /// let map: BiMap<String, String> = BiMapBuilder::new().finish();
     /// ```
     pub fn finish<L, R>(self) -> BiMap<L, R, LH, RH, B> {
