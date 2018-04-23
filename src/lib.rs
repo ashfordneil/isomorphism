@@ -387,7 +387,11 @@ where
         self.invariants();
 
         // attempt to insert, hold onto the keys if it fails
-        let failure: Option<(L, R)> = {
+        let failure: Option<(L, R)> = if MAX_LOAD_FACTOR * self.len as f32
+            >= self.left_data.len() as f32
+        {
+            Some((left, right))
+        } else {
             let &mut BiMap {
                 ref mut left_data,
                 ref mut right_data,
