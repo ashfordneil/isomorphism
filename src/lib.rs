@@ -38,7 +38,7 @@ const RESIZE_GROWTH_FACTOR: usize = 2;
 // left as a fraction to avoid floating point multiplication and division where it isn't needed
 pub(crate) const MAX_LOAD_FACTOR: f32 = 1.1;
 
-/// The two way hashmap itself. See the module level documentation for more information.
+/// The two way hashmap itself. See the crate level documentation for more information.
 ///
 /// L and R are the left and right types being mapped to eachother. LH and RH are the hash builders
 /// used to hash the left keys and right keys. B is the bitfield used to store neighbourhoods.
@@ -63,6 +63,11 @@ impl<L, R> Default for BiMap<L, R> {
 
 impl<L, R> BiMap<L, R> {
     /// Creates a new empty BiMap.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let map: BiMap<u64, char> = BiMap::new();
+    /// ```
     pub fn new() -> Self {
         Default::default()
     }
@@ -71,17 +76,52 @@ impl<L, R> BiMap<L, R> {
 impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
     /// Returns a lower bound on the number of elements that this hashmap can hold without needing
     /// to be resized.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let map: BiMap<String, String> = BiMap::new();
+    /// let capacity = map.capacity();
+    /// assert!(capacity >= 0);
+    /// ```
     pub fn capacity(&self) -> usize {
         (self.left_data.len() as f32 / MAX_LOAD_FACTOR).floor() as usize
     }
 
-    /// Returns the number of pairs inside this hashmap.
+    /// Returns the number of pairs inside this hashmap. Each remove will decrement this count.
+    /// Each insert will increment this count, but may then also decrement it by one or two if the
+    /// keys being inserted already existed and were associated with other pairs.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// assert_eq!(0, map.len());
+    ///
+    /// map.insert("Hello", "World");
+    /// map.insert("Hashmaps", "Are cool");
+    /// assert_eq!(2, map.len());
+    ///
+    /// // this removes the ("Hello", "World") pair and the ("Hashmaps", "Are cool") pair, leaving
+    /// // only the ("Hello", "Are cool") pair behind.
+    /// map.insert("Hello", "Are cool");
+    /// assert_eq!(1, map.len());
+    /// ```
     pub fn len(&self) -> usize {
         self.len
     }
 
     /// An iterator visiting all key-value pairs in an arbitrary order. The iterator element is
     /// type (&'a L, &'a R).
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// map.insert("Hello", "World");
+    /// map.insert("Hashmaps", "Are cool");
+    ///
+    /// for (&left, &right) in map.iter() {
+    ///     println!("{} {}", left, right);
+    /// }
+    /// ```
     pub fn iter(&self) -> Iter<L, R, B> {
         self.into_iter()
     }
@@ -269,6 +309,23 @@ where
     /// Inserts an (L, R) pair into the hashmap. Returned is a (R, L) tuple of options. The
     /// `Option<R>` is the value that was previously associated with the inserted L (or lack
     /// thereof), and vice versa for the `Option<L>`.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    ///
+    /// // neither "Hello" nor 5 were previously mapped to anything, so nothing is returned.
+    /// assert_eq!((None, None), map.insert("Hello", 5));
+    ///
+    /// // "Hello" was previously mapped to 5, so remapping it to 7 means that the 5 got evicted
+    /// // from the hashmap and is therefore returned. 7 was not previously mapped to anything,
+    /// // though.
+    /// assert_eq!((Some(5), None), map.insert("Hello", 7));
+    ///
+    /// // Note now that inserting "Hello" with a new right value means that 5 no longer exists in
+    /// // the hashmap.
+    /// assert_eq!(None, map.get_right(&5));
+    /// ```
     pub fn insert(&mut self, left: L, right: R) -> (Option<R>, Option<L>) {
         self.invariants();
 
@@ -445,6 +502,15 @@ where
 
     /// Gets a key from the left of the hashmap. Returns the value from the right of the hashmap
     /// that associates with this key, if it exists.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// assert_eq!(None, map.get_left("Hello"));
+    ///
+    /// map.insert("Hello", 5);
+    /// assert_eq!(Some(&5), map.get_left("Hello"));
+    /// ```
     pub fn get_left<'a, Q: ?Sized>(&'a self, left: &Q) -> Option<&'a R>
     where
         L: Borrow<Q>,
@@ -461,7 +527,16 @@ where
     }
 
     /// Gets a key from the right of the hashmap. Returns the value from the left of the hashmap
-    /// that associates with this kex, if it exists.
+    /// that associates with this key, if it exists.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// assert_eq!(None, map.get_right(&5));
+    ///
+    /// map.insert("Hello", 5);
+    /// assert_eq!(Some(&"Hello"), map.get_right(&5));
+    /// ```
     pub fn get_right<'a, Q: ?Sized>(&'a self, right: &Q) -> Option<&'a L>
     where
         R: Borrow<Q>,
@@ -478,7 +553,24 @@ where
     }
 
     /// Removes a key from the left of the hashmap. Returns the value from the right of the hashmap
-    /// that associates with this key, if it exists.
+    /// that was associated with this key, if it existed. Will remove both the left and right sides
+    /// of the pair, if it exists, meaning that `get_right` will no longer work for the value
+    /// associated with the key that is removed.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// map.insert("Hello", 5);
+    ///
+    /// assert_eq!(Some(&5), map.get_left("Hello"));
+    /// assert_eq!(Some(&"Hello"), map.get_right(&5));
+    ///
+    /// let old = map.remove_left("Hello");
+    /// assert_eq!(Some(5), old);
+    ///
+    /// assert_eq!(None, map.get_left("Hello"));
+    /// assert_eq!(None, map.get_right(&5));
+    /// ```
     pub fn remove_left<Q: ?Sized>(&mut self, left: &Q) -> Option<R>
     where
         L: Borrow<Q>,
@@ -497,7 +589,24 @@ where
     }
 
     /// Removes a key from the right of the hashmap. Returns the value from the left of the hashmap
-    /// that associates with this key, if it exists.
+    /// that was associated with this key, if it existed. Will remove both the left and right sides
+    /// of the pair, if it exists, meaning that `get_left` will no longer work for the value
+    /// associated with the key that is removed.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// map.insert("Hello", 5);
+    ///
+    /// assert_eq!(Some(&5), map.get_left("Hello"));
+    /// assert_eq!(Some(&"Hello"), map.get_right(&5));
+    ///
+    /// let old = map.remove_right(&5);
+    /// assert_eq!(Some("Hello"), old);
+    ///
+    /// assert_eq!(None, map.get_left("Hello"));
+    /// assert_eq!(None, map.get_right(&5));
+    /// ```
     pub fn remove_right<Q: ?Sized>(&mut self, right: &Q) -> Option<L>
     where
         R: Borrow<Q>,
