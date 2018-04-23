@@ -112,6 +112,20 @@ impl<L, R, LH, RH, B> BiMap<L, R, LH, RH, B> {
         self.len
     }
 
+    /// Returns true if the bimap contains no pairs.
+    ///
+    /// ```
+    /// # use bimap::BiMap;
+    /// let mut map = BiMap::new();
+    /// assert!(map.is_empty());
+    ///
+    /// map.insert("Hello", "World");
+    /// assert!(!map.is_empty());
+    /// ```
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
     /// An iterator visiting all key-value pairs in an arbitrary order. The iterator element is
     /// type (&'a L, &'a R).
     ///
