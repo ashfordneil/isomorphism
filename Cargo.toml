@@ -2,11 +2,11 @@
 authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "isomorphism"
 description = "2 directional hashmaps"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 readme = "README.md"
 categories = ["data-structures"]
-documentation = "https://docs.rs/isomorphism/0.1.0"
+documentation = "https://docs.rs/isomorphism/0.1.1"
 repository = "https://github.com/ashfordneil/isomorphism"
 
 [dependencies.serde]
