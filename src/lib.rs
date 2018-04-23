@@ -277,16 +277,27 @@ where
                 let max_offset = (ideal_index + B::size()) % len;
                 let nearest = (0..)
                     .map(|i| (len + max_offset - i) % len)
-                    .take(B::size())
+                    .take(B::size() - 1)
                     .skip(1)
                     .find(|&i| {
                         let &(_, _, ideal) = key_data[i].data.as_ref().unwrap();
-                        ideal > ideal_index || ideal < max_offset
+                        // check if the bucket we're planning to displace is closer to the blank
+                        // space than we are, and make sure that it is close enough for us to move
+                        // into its spot (more complicated due to wrap around)
+                        if ideal > ideal_index {
+                            ideal - ideal_index < B::size()
+                        } else if ideal < ideal_index {
+                            ideal < max_offset && max_offset < ideal
+                        } else {
+                            false
+                        }
                     });
                 if let Some(index) = nearest {
                     // we've found a spot to insert into
                     let (new_key, new_value, new_ideal) = key_data[index].data.take().unwrap();
+                    Self::mark_as_empty(new_ideal, index, key_data);
                     key_data[index].data = Some((key, usize::max_value(), ideal_index));
+                    Self::mark_as_full(ideal_index, index, key_data);
                     match Self::insert_one_sided(new_key, key_data, value_data, hasher) {
                         Ok(new_key_index) => {
                             // the replacement worked
@@ -298,15 +309,15 @@ where
                                     key_data[new_key_index].data.as_mut().unwrap();
                                 *paired_value_index = new_value;
                             }
-                            Self::mark_as_empty(new_ideal, index, key_data);
                             Self::mark_as_full(new_ideal, new_key_index, key_data);
 
                             // finish our insert and return
-                            Self::mark_as_full(ideal_index, index, key_data);
                             Ok(index)
                         }
                         Err(new_key) => {
                             // the replacement failed - undo our insert
+                            Self::mark_as_full(new_ideal, index, key_data);
+                            Self::mark_as_empty(ideal_index, index, key_data);
                             let (key, _, _) = key_data[index].data.take().unwrap();
                             key_data[index].data = Some((new_key, new_value, new_ideal));
                             Err(key)
