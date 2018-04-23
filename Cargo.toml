@@ -5,6 +5,8 @@ version = "0.1.0"
 license = "MIT"
 readme = "README.md"
 categories = ["data-structures"]
+documentation = "https://docs.rs/isomorphism/0.1.0"
+repository = "https://github.com/ashfordneil/isomorphism"
 
 [dependencies.serde]
 version = "1.0.42"
