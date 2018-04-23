@@ -2,6 +2,9 @@
 authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "isomorphism"
 version = "0.1.0"
+license = "MIT"
+readme = "README.md"
+categories = ["data-structures"]
 
 [dependencies.serde]
 version = "1.0.42"
