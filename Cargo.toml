@@ -1,7 +1,7 @@
 [package]
 authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "isomorphism"
-description = "2 directional hashmaps"
+description = "Fast 2 way hashmaps designed to optimise cache locality."
 version = "0.1.2"
 license = "MIT"
 readme = "README.md"
