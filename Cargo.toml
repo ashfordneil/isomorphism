@@ -1,12 +1,13 @@
 [package]
 authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "isomorphism"
+edition = "2018"
 description = "2 directional hashmaps"
-version = "0.1.2"
+version = "0.1.3"
 license = "MIT"
 readme = "README.md"
 categories = ["data-structures"]
-documentation = "https://docs.rs/isomorphism/0.1.2"
+documentation = "https://docs.rs/isomorphism/0.1.3"
 repository = "https://github.com/ashfordneil/isomorphism"
 
 [dependencies.serde]

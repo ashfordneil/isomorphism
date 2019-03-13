@@ -1,11 +1,10 @@
-use {BiMap, DEFAULT_HASH_MAP_SIZE, MAX_LOAD_FACTOR};
-use bitfield::{BitField, DefaultBitField};
-use bucket::Bucket;
+use crate::{
+    bitfield::{BitField, DefaultBitField},
+    bucket::Bucket,
+    {BiMap, DEFAULT_HASH_MAP_SIZE, MAX_LOAD_FACTOR},
+};
 
-use std::cmp;
-use std::collections::hash_map::RandomState;
-use std::hash::BuildHasher;
-use std::marker::PhantomData;
+use std::{cmp, collections::hash_map::RandomState, hash::BuildHasher, marker::PhantomData};
 
 /// A builder for the bimap. Allows for the parameters used to tune the BiMap to be configured.
 #[derive(Debug)]

@@ -152,71 +152,6 @@ where
     RH: BuildHasher,
     B: BitField,
 {
-    /// check the invariants of this hashmap, panicking if they are not met
-    fn invariants(&self) {
-        // check lengths
-        assert_eq!(self.left_data.len(), self.right_data.len());
-        let len = self.left_data.len();
-
-        // check ideal indexes are stored correctly (in the bucket and its ideal bucket's bitfield)
-        self.left_data
-            .iter()
-            .enumerate()
-            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
-            .for_each(|(i, &(ref key, _value, ideal))| {
-                assert_eq!(Self::find_ideal_index(key, &self.left_hasher, len), ideal);
-                assert!(
-                    (self.left_data[ideal].neighbourhood | B::zero_at((len + i - ideal) % len))
-                        .full()
-                );
-            });
-        self.right_data
-            .iter()
-            .enumerate()
-            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
-            .for_each(|(i, &(ref key, _value, ideal))| {
-                assert_eq!(Self::find_ideal_index(key, &self.right_hasher, len), ideal);
-                assert!(
-                    (self.right_data[ideal].neighbourhood | B::zero_at((len + i - ideal) % len))
-                        .full()
-                );
-            });
-
-        // check matches exist
-        self.left_data
-            .iter()
-            .enumerate()
-            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
-            .for_each(|(i, &(ref _key, value, _ideal))| {
-                let &(_, pair_value, _) = self.right_data[value].data.as_ref().unwrap();
-                assert_eq!(pair_value, i);
-            });
-        self.right_data
-            .iter()
-            .enumerate()
-            .filter_map(|(i, bucket)| bucket.data.as_ref().map(|bucket| (i, bucket)))
-            .for_each(|(i, &(ref _key, value, _ideal))| {
-                let &(_, pair_value, _) = self.left_data[value].data.as_ref().unwrap();
-                assert_eq!(pair_value, i);
-            });
-
-        // check length reporting holds
-        assert_eq!(
-            self.left_data
-                .iter()
-                .filter(|bucket| bucket.data.is_some())
-                .count(),
-            self.len()
-        );
-        assert_eq!(
-            self.right_data
-                .iter()
-                .filter(|bucket| bucket.data.is_some())
-                .count(),
-            self.len()
-        );
-    }
-
     /// Finds the ideal position of a key within the hashmap.
     fn find_ideal_index<K: Hash, H: BuildHasher>(key: &K, hasher: &H, len: usize) -> usize {
         let mut hasher = hasher.build_hasher();
@@ -355,8 +290,6 @@ where
     /// assert_eq!(None, map.get_right(&5));
     /// ```
     pub fn insert(&mut self, left: L, right: R) -> (Option<R>, Option<L>) {
-        self.invariants();
-
         let output = {
             let &mut BiMap {
                 ref mut len,
@@ -366,21 +299,24 @@ where
                 ref right_hasher,
             } = self;
             match Self::remove(&left, left_data, right_data, left_hasher, right_hasher, len) {
-                Some((old_left, old_right)) => if old_right == right {
-                    (Some(old_right), Some(old_left))
-                } else {
-                    (
-                        Some(old_right),
-                        Self::remove(
-                            &right,
-                            right_data,
-                            left_data,
-                            right_hasher,
-                            left_hasher,
-                            len,
-                        ).map(|(_key, value)| value),
-                    )
-                },
+                Some((old_left, old_right)) => {
+                    if old_right == right {
+                        (Some(old_right), Some(old_left))
+                    } else {
+                        (
+                            Some(old_right),
+                            Self::remove(
+                                &right,
+                                right_data,
+                                left_data,
+                                right_hasher,
+                                left_hasher,
+                                len,
+                            )
+                            .map(|(_key, value)| value),
+                        )
+                    }
+                }
                 None => (
                     None,
                     Self::remove(
@@ -390,12 +326,11 @@ where
                         right_hasher,
                         left_hasher,
                         len,
-                    ).map(|(_key, value)| value),
+                    )
+                    .map(|(_key, value)| value),
                 ),
             }
         };
-
-        self.invariants();
 
         // attempt to insert, hold onto the keys if it fails
         let failure: Option<(L, R)> = if MAX_LOAD_FACTOR * self.len as f32
@@ -438,8 +373,6 @@ where
             self.len += 1;
         }
 
-        self.invariants();
-
         if let Some((left, right)) = failure {
             // resize, as we were unable to insert
             self.len = 0;
@@ -453,8 +386,6 @@ where
                     self.insert(left, right);
                 });
         }
-
-        self.invariants();
 
         output
     }
@@ -508,12 +439,14 @@ where
         let index = Self::find_ideal_index(&key, key_hasher, len);
 
         let neighbourhood = key_data[index].neighbourhood;
-        if let Some(offset) = neighbourhood.iter().find(|offset| {
-            match key_data[(index + offset) % len].data {
-                Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
-                _ => false,
-            }
-        }) {
+        if let Some(offset) =
+            neighbourhood
+                .iter()
+                .find(|offset| match key_data[(index + offset) % len].data {
+                    Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
+                    _ => false,
+                })
+        {
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
             let (key, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
             let (value, ..) = value_data[value_index].data.take().unwrap();
@@ -548,7 +481,6 @@ where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.invariants();
         let &BiMap {
             ref left_data,
             ref right_data,
@@ -574,7 +506,6 @@ where
         R: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.invariants();
         let &BiMap {
             ref right_data,
             ref left_data,
@@ -608,7 +539,6 @@ where
         L: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.invariants();
         let &mut BiMap {
             ref mut len,
             ref mut left_data,
@@ -644,7 +574,6 @@ where
         R: Borrow<Q>,
         Q: Hash + Eq,
     {
-        self.invariants();
         let &mut BiMap {
             ref mut len,
             ref mut left_data,
@@ -666,10 +595,11 @@ where
     B: BitField,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().all(|(left, right)| {
-            other.get_left(left).map_or(false, |r| *right == *r)
-                && other.get_right(right).map_or(false, |l| *left == *l)
-        })
+        self.len() == other.len()
+            && self.iter().all(|(left, right)| {
+                other.get_left(left).map_or(false, |r| *right == *r)
+                    && other.get_right(right).map_or(false, |l| *left == *l)
+            })
     }
 }
 
@@ -834,7 +764,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use BiMap;
+    use crate::BiMap;
 
     #[test]
     fn test_iteration_empty() {
