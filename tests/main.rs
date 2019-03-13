@@ -1,12 +1,6 @@
-extern crate isomorphism;
-#[macro_use]
-extern crate quickcheck;
-
-use std::collections::HashSet;
-
 use isomorphism::{BiMap, BiMapBuilder};
-
-use quickcheck::TestResult;
+use quickcheck::{quickcheck, TestResult};
+use std::collections::HashSet;
 
 quickcheck! {
     fn test_capacity(cap: usize) -> bool {
