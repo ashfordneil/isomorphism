@@ -299,21 +299,24 @@ where
                 ref right_hasher,
             } = self;
             match Self::remove(&left, left_data, right_data, left_hasher, right_hasher, len) {
-                Some((old_left, old_right)) => if old_right == right {
-                    (Some(old_right), Some(old_left))
-                } else {
-                    (
-                        Some(old_right),
-                        Self::remove(
-                            &right,
-                            right_data,
-                            left_data,
-                            right_hasher,
-                            left_hasher,
-                            len,
-                        ).map(|(_key, value)| value),
-                    )
-                },
+                Some((old_left, old_right)) => {
+                    if old_right == right {
+                        (Some(old_right), Some(old_left))
+                    } else {
+                        (
+                            Some(old_right),
+                            Self::remove(
+                                &right,
+                                right_data,
+                                left_data,
+                                right_hasher,
+                                left_hasher,
+                                len,
+                            )
+                            .map(|(_key, value)| value),
+                        )
+                    }
+                }
                 None => (
                     None,
                     Self::remove(
@@ -323,11 +326,11 @@ where
                         right_hasher,
                         left_hasher,
                         len,
-                    ).map(|(_key, value)| value),
+                    )
+                    .map(|(_key, value)| value),
                 ),
             }
         };
-
 
         // attempt to insert, hold onto the keys if it fails
         let failure: Option<(L, R)> = if MAX_LOAD_FACTOR * self.len as f32
@@ -369,7 +372,6 @@ where
         if failure.is_none() {
             self.len += 1;
         }
-
 
         if let Some((left, right)) = failure {
             // resize, as we were unable to insert
@@ -437,12 +439,14 @@ where
         let index = Self::find_ideal_index(&key, key_hasher, len);
 
         let neighbourhood = key_data[index].neighbourhood;
-        if let Some(offset) = neighbourhood.iter().find(|offset| {
-            match key_data[(index + offset) % len].data {
-                Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
-                _ => false,
-            }
-        }) {
+        if let Some(offset) =
+            neighbourhood
+                .iter()
+                .find(|offset| match key_data[(index + offset) % len].data {
+                    Some((ref candidate_key, ..)) => candidate_key.borrow() == key,
+                    _ => false,
+                })
+        {
             key_data[index].neighbourhood = neighbourhood & B::zero_at(offset);
             let (key, value_index, _) = key_data[(index + offset) % len].data.take().unwrap();
             let (value, ..) = value_data[value_index].data.take().unwrap();
@@ -591,10 +595,11 @@ where
     B: BitField,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.len() == other.len() && self.iter().all(|(left, right)| {
-            other.get_left(left).map_or(false, |r| *right == *r)
-                && other.get_right(right).map_or(false, |l| *left == *l)
-        })
+        self.len() == other.len()
+            && self.iter().all(|(left, right)| {
+                other.get_left(left).map_or(false, |r| *right == *r)
+                    && other.get_right(right).map_or(false, |l| *left == *l)
+            })
     }
 }
 
@@ -759,7 +764,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use BiMap;
+    use crate::BiMap;
 
     #[test]
     fn test_iteration_empty() {

@@ -1,6 +1,7 @@
 [package]
 authors = ["Neil Ashford <ashfordneil0@gmail.com>"]
 name = "isomorphism"
+edition = "2018"
 description = "2 directional hashmaps"
 version = "0.1.2"
 license = "MIT"

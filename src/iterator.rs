@@ -1,4 +1,4 @@
-use bucket::Bucket;
+use crate::bucket::Bucket;
 
 use std::iter::Iterator;
 use std::slice;

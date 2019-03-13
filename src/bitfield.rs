@@ -127,7 +127,7 @@ pub type DefaultBitField = u32;
 
 #[cfg(test)]
 mod test {
-    use BitField;
+    use super::BitField;
 
     use quickcheck::TestResult;
 

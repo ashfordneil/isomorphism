@@ -1,4 +1,4 @@
-use bitfield::BitField;
+use crate::bitfield::BitField;
 
 /// A single bucket within a hopscotch hashed hashmap.
 #[derive(Clone, Debug)]
@@ -32,8 +32,7 @@ impl<K, V, B: BitField + Copy> Bucket<K, V, B> {
 
 #[cfg(test)]
 mod tests {
-    use bitfield::DefaultBitField;
-    use bucket::Bucket;
+    use crate::{bitfield::DefaultBitField, bucket::Bucket};
 
     #[test]
     fn test_empty_vec() {
@@ -46,9 +45,8 @@ mod tests {
         let length = 1024;
         let vec: Box<[Bucket<(), (), DefaultBitField>]> = Bucket::empty_vec(length);
         assert!(vec.len() == length);
-        assert!(
-            vec.iter()
-                .all(|element| element.data == None && element.neighbourhood == 0)
-        );
+        assert!(vec
+            .iter()
+            .all(|element| element.data == None && element.neighbourhood == 0));
     }
 }
