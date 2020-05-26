@@ -45,6 +45,7 @@ pub(crate) const MAX_LOAD_FACTOR: f32 = 1.1;
 ///
 /// L and R are the left and right types being mapped to eachother. LH and RH are the hash builders
 /// used to hash the left keys and right keys. B is the bitfield used to store neighbourhoods.
+#[derive(Clone)]
 pub struct BiMap<L, R, LH = RandomState, RH = RandomState, B = DefaultBitField> {
     /// The number of pairs inside the map
     len: usize,
